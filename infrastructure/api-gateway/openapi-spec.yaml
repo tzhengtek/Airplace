@@ -1,0 +1,20 @@
+info:
+  title: AirPlace - API Gateway
+  description: AirPlace Gateway configuration
+  version: 1.0.0
+schemes:
+  - https
+produces:
+  - application/json
+paths:
+  /v1/api-proxy:
+    get:
+      summary: API proxy
+      operationId: proxy
+      x-google-backend:
+        address: https://hello-world-hn2wtuxuha-ew.a.run.app
+      responses:
+        '200':
+          description: A successful response
+          schema:
+            type: string
