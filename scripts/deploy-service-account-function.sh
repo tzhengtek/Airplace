@@ -209,7 +209,7 @@ while true; do
         4) BASE_IMAGE="java21"; break ;;
         5) BASE_IMAGE="ruby34"; break ;;
         6) BASE_IMAGE="dotnet8"; break ;;
-        7) BASE_IMAGE="php83"; break ;;
+        7) BASE_IMAGE="php84"; break ;;
         8) 
             echo -e "${BLUE}Enter custom base image name:${NC}"
             read -p "> " BASE_IMAGE
@@ -357,13 +357,15 @@ echo "    --region $REGION \\"
 echo "    --service-account ${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com \\"
 echo "    --project=$PROJECT_ID \\"
 echo "    --cpu-boost \\"
+echo "    --min-instances 1"
 echo "    --execution-environment gen1 \\"
 echo "    --no-allow-unauthenticated"
 echo ""
 
 if prompt_yes_no "Execute this command?"; then
     execute_command \
-        "gcloud run deploy $FUNCTION_NAME --source $SOURCE_DIR --function $ENTRY_POINT --base-image $BASE_IMAGE --region $REGION --service-account ${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com --project=$PROJECT_ID --cpu-boost --execution-environment gen1 --no-allow-unauthenticated" \
+        "gcloud run deploy $FUNCTION_NAME --source $SOURCE_DIR --function $ENTRY_POINT --base-image $BASE_IMAGE --region $REGION --service-account ${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com --project=$PROJECT_ID --cpu-boost --execution-environment gen1 --min-instances 1 --no-allow-unauthenticated" \
+        
         "Cloud Function deployed successfully"
     
     if [ $? -eq 0 ] || [ "$DRY_RUN" = true ]; then
