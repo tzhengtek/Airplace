@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Dropdown } from "./dropdown/dropdown";
+import { Canvas } from "./canvas/canvas";
 import { ThemeProvider } from "./provider/theme-provider";
 import "./globals.css";
 
@@ -30,6 +31,11 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Dropdown />
+        <div
+          style={{ minHeight: "100vh", display: "grid", placeItems: "center" }}
+        >
+          <Canvas />
+        </div>
         {children}
       </body>
     </html>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { JSX, useState } from "react";
 import {
   Description,
   Dialog,
@@ -20,7 +20,7 @@ import {
 import { CheckIcon, X, EllipsisVertical } from "lucide-react";
 import clsx from "clsx";
 
-export function Dropdown() {
+export function Dropdown(): JSX.Element {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
 
   const menuItems = [
@@ -30,7 +30,7 @@ export function Dropdown() {
   ];
 
   return (
-    <div>
+    <div className="fixed top-3 z-[10000]">
       <Menu as="div" className="relative inline-block">
         <MenuButton className="mt-12 ml-12 flex items-center justify-center rounded-full size-12 bg-white text-sm font-semibold text-black data-focus:text-blue hover:bg-blue-100">
           <EllipsisVertical className="w-6 h-6" />
