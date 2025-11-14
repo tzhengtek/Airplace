@@ -8,6 +8,7 @@ import {
   ForegroundCanvas,
 } from "react-pixel-art-canvas";
 import type { CanvasRef, Tool } from "react-pixel-art-canvas";
+import { useAppContext } from "../context/AppContext";
 
 export function Canvas() {
   const gridSize = 100;
@@ -17,7 +18,7 @@ export function Canvas() {
   const foregroundCanvasRef = useRef<CanvasRef>(null);
 
   const [tool, setTool] = useState<Tool>("paint");
-  const [color, setColor] = useState("#113db8");
+  const { selectedColor, setSelectedColor } = useAppContext();
 
   const handleClear = () => {
     drawingCanvasRef.current?.clearCanvas();
@@ -33,17 +34,18 @@ export function Canvas() {
       >
         clear
       </button>
+      <div>{selectedColor}</div>
       <ReactPixelArtCanvas
         width={canvaSize}
         height={canvaSize}
-        styles={{ border: "1px solid #ffffffff" }}
+        className="bg-white"
       >
         <DrawingCanvas
           ref={drawingCanvasRef}
           gridSize={gridSize}
           width={canvaSize}
           height={canvaSize}
-          selectedColor={color}
+          selectedColor={selectedColor}
           selectedTool={tool}
           history={true}
         />

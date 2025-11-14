@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Dropdown } from "./dropdown/dropdown";
 import { Canvas } from "./canvas/canvas";
-import { ThemeProvider } from "./provider/theme-provider";
+import { AppProvider } from "./context/AppContext";
 import { ColorPanel } from "@/app/canvas/color-panel/color-panel";
 
 import "./globals.css";
@@ -32,12 +32,14 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Dropdown />
-        <div style={{ display: "grid", placeItems: "center" }}>
-          <Canvas />
-        </div>
-        <ColorPanel />
-        {children}
+        <AppProvider>
+          <Dropdown />
+          <div style={{ display: "grid", placeItems: "center" }}>
+            <Canvas />
+          </div>
+          <ColorPanel />
+          {children}
+        </AppProvider>
       </body>
     </html>
   );
