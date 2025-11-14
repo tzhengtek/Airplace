@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "./proxy-pb"; 
+
+package proxy;
+
+message AirplaceBody {
+  Command command = 1;
+  int32 x = 2;
+  int32 y = 3;
+  uint32 color = 4;
+  string user = 5;
+  google.protobuf.Timestamp timestamp = 6;
+}
+
+enum Command {
+  DRAW = 0;
+  PROCESSED = 1;
+}
