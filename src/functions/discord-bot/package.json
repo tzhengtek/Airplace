@@ -14,9 +14,9 @@
     "author": "Google LLC",
     "license": "Apache-2.0",
     "dependencies": {
+        "@google-cloud/functions-framework": "^4.0.1",
         "@google-cloud/pubsub": "^5.2.0",
         "@google-cloud/secret-manager": "^5.0.0",
-        "discord-interactions": "^4.0.0",
-        "express": "^4.17.1"
+        "discord-interactions": "^4.0.0"
     }
 }
