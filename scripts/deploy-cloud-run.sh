@@ -123,6 +123,9 @@ show_summary() {
     if [ -n "$ENTRYPOINT" ]; then
         echo -e "${BLUE}Entrypoint:${NC} $ENTRYPOINT"
     fi
+    if [ -n "$ENV_VARS" ]; then
+        echo -e "${BLUE}Environment Variables:${NC} $ENV_VARS"
+    fi
     echo -e "${BLUE}Allow Unauthenticated:${NC} $ALLOW_UNAUTH"
     echo ""
 }
@@ -250,6 +253,9 @@ deploy_service() {
         if [ -n "$ENTRYPOINT" ]; then
             echo "  --function $ENTRYPOINT \\"
         fi
+        if [ -n "$ENV_VARS" ]; then
+            echo "  --set-env-vars $ENV_VARS \\"
+        fi
         echo "  $ALLOW_UNAUTH"
         return 0
     fi
@@ -268,6 +274,11 @@ deploy_service() {
     # Add entrypoint if specified
     if [ -n "$ENTRYPOINT" ]; then
         deploy_cmd="$deploy_cmd --function \"$ENTRYPOINT\""
+    fi
+    
+    # Add environment variables if specified
+    if [ -n "$ENV_VARS" ]; then
+        deploy_cmd="$deploy_cmd --set-env-vars \"$ENV_VARS\""
     fi
     
     # Add service account only for new deployments
@@ -488,6 +499,52 @@ while [ -z "$ENTRYPOINT" ]; do
         print_success "Entrypoint set to: $ENTRYPOINT"
     fi
 done
+
+# Environment variables configuration
+echo ""
+print_info "Environment Variables Configuration"
+print_info "Enter environment variables. Leave KEY empty to finish."
+ENV_VARS=""
+ENV_COUNT=0
+
+while true; do
+    ENV_COUNT=$((ENV_COUNT + 1))
+    echo ""
+    ENV_KEY=$(get_input "Enter environment variable KEY (or leave empty to finish)" "")
+    
+    # If KEY is empty, stop collecting environment variables
+    if [ -z "$ENV_KEY" ]; then
+        if [ $ENV_COUNT -eq 1 ]; then
+            print_info "No environment variables configured"
+        else
+            print_success "Finished configuring environment variables"
+        fi
+        break
+    fi
+    
+    # Ask for VALUE, showing which KEY we're setting
+    ENV_VALUE=$(get_input "Setting $ENV_KEY: Enter value" "")
+    
+    if [ -z "$ENV_VALUE" ]; then
+        print_warning "Value is empty for $ENV_KEY. Skipping this variable."
+        ENV_COUNT=$((ENV_COUNT - 1))
+        continue
+    fi
+    
+    # Add to ENV_VARS string in format KEY1=VALUE1,KEY2=VALUE2
+    if [ -z "$ENV_VARS" ]; then
+        ENV_VARS="${ENV_KEY}=${ENV_VALUE}"
+    else
+        ENV_VARS="${ENV_VARS},${ENV_KEY}=${ENV_VALUE}"
+    fi
+    
+    print_success "Added: $ENV_KEY=$ENV_VALUE"
+done
+
+if [ -n "$ENV_VARS" ]; then
+    echo ""
+    print_success "Environment variables configured: $ENV_VARS"
+fi
 
 # Service account configuration (only for new deployments)
 echo ""
