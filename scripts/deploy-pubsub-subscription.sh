@@ -141,7 +141,17 @@ list_topics() {
     local project="$1"
     
     print_info "Fetching existing Pub/Sub topics..."
-    gcloud pubsub topics list --project "$project" 2>/dev/null
+    local topics=$(gcloud pubsub topics list --project "$project" --format 'value(name)' 2>/dev/null)
+    
+    if [ -z "$topics" ]; then
+        print_info "No existing topics found"
+    else
+        echo "$topics" | while read -r topic; do
+            # Extract just the topic name (last part after /)
+            local topic_name=$(echo "$topic" | awk -F'/' '{print $NF}')
+            echo "  - $topic_name"
+        done
+    fi
 }
 
 # Function to display deployment summary
@@ -158,6 +168,10 @@ show_summary() {
         echo -e "${BLUE}Push Auth Service Account:${NC} $PUSH_AUTH_SA"
     else
         echo -e "${BLUE}Subscription Type:${NC} Pull"
+    fi
+    if [ -n "$DEAD_LETTER_TOPIC" ]; then
+        echo -e "${BLUE}Dead Letter Topic:${NC} $DEAD_LETTER_TOPIC"
+        echo -e "${BLUE}Max Delivery Attempts:${NC} $MAX_DELIVERY_ATTEMPTS"
     fi
     echo ""
 }
@@ -193,6 +207,10 @@ deploy_subscription() {
             echo "  --push-endpoint=$PUSH_ENDPOINT \\"
             echo "  --push-auth-service-account=$PUSH_AUTH_SA \\"
         fi
+        if [ -n "$DEAD_LETTER_TOPIC" ]; then
+            echo "  --dead-letter-topic=$DEAD_LETTER_TOPIC \\"
+            echo "  --max-delivery-attempts=$MAX_DELIVERY_ATTEMPTS \\"
+        fi
         echo "  --project=$PROJECT_ID"
         if [ -n "$PUSH_ENDPOINT" ] && [ -n "$SERVICE_NAME" ] && [ -n "$REGION" ]; then
             echo ""
@@ -216,6 +234,12 @@ deploy_subscription() {
     if [ -n "$PUSH_ENDPOINT" ]; then
         create_cmd="$create_cmd --push-endpoint=\"$PUSH_ENDPOINT\""
         create_cmd="$create_cmd --push-auth-service-account=\"$PUSH_AUTH_SA\""
+    fi
+    
+    # Add dead letter topic if specified
+    if [ -n "$DEAD_LETTER_TOPIC" ]; then
+        create_cmd="$create_cmd --dead-letter-topic=\"$DEAD_LETTER_TOPIC\""
+        create_cmd="$create_cmd --max-delivery-attempts=\"$MAX_DELIVERY_ATTEMPTS\""
     fi
     
     # Create the subscription
@@ -362,7 +386,7 @@ echo ""
 PUSH_ENDPOINT=""
 PUSH_AUTH_SA="cloud-run-pubsub-invoker@serveless-epitech-dev.iam.gserviceaccount.com"
 
-if ask_yes_no "Is this a push subscription (messages pushed to Cloud Run)?" "n"; then
+if ask_yes_no "Is this a push subscription (messages pushed to Cloud Run)?" "y"; then
     echo ""
     print_info "Push Subscription Configuration"
     
@@ -402,6 +426,73 @@ if ask_yes_no "Is this a push subscription (messages pushed to Cloud Run)?" "n";
     print_warning "Make sure this service account has the 'roles/run.invoker' role on the Cloud Run service"
 fi
 
+echo ""
+
+# Ask if this subscription should have a dead letter topic
+DEAD_LETTER_TOPIC=""
+MAX_DELIVERY_ATTEMPTS=""
+
+if ask_yes_no "Do you want to configure a dead letter topic?" "y"; then
+    echo ""
+    print_info "Dead Letter Topic Configuration"
+    
+    # List existing topics
+    list_topics "$PROJECT_ID"
+    echo ""
+    
+    # Get dead letter topic name and validate it exists
+    while true; do
+        DEAD_LETTER_TOPIC=$(get_input "Enter dead letter topic name" "")
+        
+        if [ -z "$DEAD_LETTER_TOPIC" ]; then
+            print_error "Dead letter topic name cannot be empty"
+            continue
+        fi
+        
+        # Check if topic exists
+        if [ "$DRY_RUN" = false ]; then
+            if check_topic_exists "$DEAD_LETTER_TOPIC" "$PROJECT_ID" >/dev/null 2>&1; then
+                print_success "Dead letter topic '$DEAD_LETTER_TOPIC' found"
+                break
+            else
+                print_error "Dead letter topic '$DEAD_LETTER_TOPIC' does not exist in project '$PROJECT_ID'"
+                print_info "Please create the topic first using: ./deploy-pubsub-topic.sh"
+                if ! ask_yes_no "Do you want to try another topic name?" "y"; then
+                    print_info "Dead letter topic configuration cancelled"
+                    DEAD_LETTER_TOPIC=""
+                    break
+                fi
+                echo ""
+            fi
+        else
+            # In dry-run mode, just accept the topic name
+            print_warning "[DRY RUN] Would check if dead letter topic '$DEAD_LETTER_TOPIC' exists"
+            break
+        fi
+    done
+    
+    # Get max delivery attempts if dead letter topic is set
+    if [ -n "$DEAD_LETTER_TOPIC" ]; then
+        echo ""
+        MAX_DELIVERY_ATTEMPTS=$(get_input "Enter maximum delivery attempts" "5")
+        
+        # Validate max delivery attempts is a number
+        if ! [[ "$MAX_DELIVERY_ATTEMPTS" =~ ^[0-9]+$ ]]; then
+            print_error "Maximum delivery attempts must be a positive number"
+            exit 1
+        fi
+        
+        # Validate max delivery attempts range (Pub/Sub allows 5-100)
+        if [ "$MAX_DELIVERY_ATTEMPTS" -lt 5 ] || [ "$MAX_DELIVERY_ATTEMPTS" -gt 100 ]; then
+            print_warning "Maximum delivery attempts should be between 5 and 100 (got: $MAX_DELIVERY_ATTEMPTS)"
+            if ! ask_yes_no "Do you want to continue with this value?" "n"; then
+                print_info "Deployment cancelled"
+                exit 0
+            fi
+        fi
+    fi
+fi
+
 # Show summary and confirm
 show_summary "Create New Subscription"
 
@@ -422,6 +513,10 @@ if deploy_subscription; then
     if [ -n "$PUSH_ENDPOINT" ]; then
         echo -e "${BLUE}Push Endpoint:${NC} ${PUSH_ENDPOINT}"
         echo -e "${BLUE}Cloud Run Service:${NC} ${SERVICE_NAME} (${REGION})"
+    fi
+    if [ -n "$DEAD_LETTER_TOPIC" ]; then
+        echo -e "${BLUE}Dead Letter Topic:${NC} ${DEAD_LETTER_TOPIC}"
+        echo -e "${BLUE}Max Delivery Attempts:${NC} ${MAX_DELIVERY_ATTEMPTS}"
     fi
     echo ""
     print_success "Subscription created successfully!"
