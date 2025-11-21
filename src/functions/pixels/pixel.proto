@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "./pixelpb"; 
+
+package pixel;
+
+message PixelInfo {
+  int32 x = 2;
+  int32 y = 3;
+  uint32 color = 4;
+  string user = 5;
+  google.protobuf.Timestamp timestamp = 6;
+}

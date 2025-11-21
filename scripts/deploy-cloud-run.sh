@@ -167,6 +167,12 @@ deploy_service() {
                         return 1
                     fi
                     print_success "Service account created successfully"
+                    
+                    # Wait for Google Cloud to update the service account
+                    echo ""
+                    print_info "Waiting 10 seconds for Google Cloud to propagate service account changes..."
+                    sleep 10
+                    print_success "Service account propagation complete"
                 fi
             fi
         fi
