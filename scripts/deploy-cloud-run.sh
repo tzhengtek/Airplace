@@ -120,6 +120,9 @@ show_summary() {
     echo -e "${BLUE}Source Directory:${NC} $SOURCE_DIR"
     echo -e "${BLUE}Base Image:${NC} $BASE_IMAGE"
     echo -e "${BLUE}Min Instances:${NC} $MIN_INSTANCES"
+    if [ -n "$ENTRYPOINT" ]; then
+        echo -e "${BLUE}Entrypoint:${NC} $ENTRYPOINT"
+    fi
     echo -e "${BLUE}Allow Unauthenticated:${NC} $ALLOW_UNAUTH"
     echo ""
 }
@@ -244,6 +247,9 @@ deploy_service() {
         echo "  --cpu-boost \\"
         echo "  --execution-environment gen1 \\"
         echo "  --min-instances $MIN_INSTANCES \\"
+        if [ -n "$ENTRYPOINT" ]; then
+            echo "  --function $ENTRYPOINT \\"
+        fi
         echo "  $ALLOW_UNAUTH"
         return 0
     fi
@@ -258,6 +264,11 @@ deploy_service() {
         --execution-environment gen1 \
         --min-instances \"$MIN_INSTANCES\" \
         $ALLOW_UNAUTH"
+    
+    # Add entrypoint if specified
+    if [ -n "$ENTRYPOINT" ]; then
+        deploy_cmd="$deploy_cmd --function \"$ENTRYPOINT\""
+    fi
     
     # Add service account only for new deployments
     if [ -n "$SERVICE_ACCOUNT_NAME" ]; then
@@ -465,6 +476,18 @@ print_success "Selected base image: $BASE_IMAGE"
 echo ""
 
 MIN_INSTANCES=$(get_input "Enter minimum instances" "1")
+
+# Entrypoint configuration (required)
+echo ""
+ENTRYPOINT=""
+while [ -z "$ENTRYPOINT" ]; do
+    ENTRYPOINT=$(get_input "Enter entrypoint command" "")
+    if [ -z "$ENTRYPOINT" ]; then
+        print_error "Entrypoint cannot be empty. Please provide a command."
+    else
+        print_success "Entrypoint set to: $ENTRYPOINT"
+    fi
+done
 
 # Service account configuration (only for new deployments)
 echo ""
