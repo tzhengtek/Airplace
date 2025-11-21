@@ -194,6 +194,15 @@ deploy_subscription() {
             echo "  --push-auth-service-account=$PUSH_AUTH_SA \\"
         fi
         echo "  --project=$PROJECT_ID"
+        if [ -n "$PUSH_ENDPOINT" ] && [ -n "$SERVICE_NAME" ] && [ -n "$REGION" ]; then
+            echo ""
+            echo "Would also execute:"
+            echo "gcloud run services add-iam-policy-binding $SERVICE_NAME \\"
+            echo "  --member=serviceAccount:${PUSH_AUTH_SA} \\"
+            echo "  --role=roles/run.invoker \\"
+            echo "  --region=$REGION \\"
+            echo "  --project=$PROJECT_ID"
+        fi
         return 0
     fi
     
@@ -222,6 +231,26 @@ deploy_subscription() {
         gcloud pubsub subscriptions describe "$SUBSCRIPTION_NAME" \
             --project="$PROJECT_ID" \
             --format="table(name,topic,ackDeadlineSeconds,pushConfig.pushEndpoint)" 2>/dev/null
+        
+        # If this is a push subscription, grant IAM permissions to the service account
+        if [ -n "$PUSH_ENDPOINT" ] && [ -n "$SERVICE_NAME" ] && [ -n "$REGION" ]; then
+            echo ""
+            print_info "Granting IAM permissions to service account for Cloud Run service..."
+            
+            gcloud run services add-iam-policy-binding "$SERVICE_NAME" \
+                --member="serviceAccount:${PUSH_AUTH_SA}" \
+                --role="roles/run.invoker" \
+                --region="$REGION" \
+                --project="$PROJECT_ID"
+            
+            if [ $? -eq 0 ]; then
+                print_success "IAM policy binding added successfully!"
+                print_info "Service account '${PUSH_AUTH_SA}' can now invoke Cloud Run service '$SERVICE_NAME'"
+            else
+                print_warning "Failed to add IAM policy binding (subscription created successfully)"
+                print_warning "You may need to manually grant the 'roles/run.invoker' role to '${PUSH_AUTH_SA}' on service '$SERVICE_NAME'"
+            fi
+        fi
         
         return 0
     else
@@ -392,8 +421,7 @@ if deploy_subscription; then
     echo -e "${BLUE}Ack Deadline:${NC} ${ACK_DEADLINE} seconds"
     if [ -n "$PUSH_ENDPOINT" ]; then
         echo -e "${BLUE}Push Endpoint:${NC} ${PUSH_ENDPOINT}"
-        echo ""
-        print_warning "Remember to grant the service account '${PUSH_AUTH_SA}' the 'roles/run.invoker' role on the Cloud Run service if not already done."
+        echo -e "${BLUE}Cloud Run Service:${NC} ${SERVICE_NAME} (${REGION})"
     fi
     echo ""
     print_success "Subscription created successfully!"
