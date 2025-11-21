@@ -173,6 +173,9 @@ show_summary() {
         echo -e "${BLUE}Dead Letter Topic:${NC} $DEAD_LETTER_TOPIC"
         echo -e "${BLUE}Max Delivery Attempts:${NC} $MAX_DELIVERY_ATTEMPTS"
     fi
+    if [ -n "$PUSH_AUTH_SA" ]; then
+        echo -e "${BLUE}Topic Publisher & Subscriber SA:${NC} $PUSH_AUTH_SA"
+    fi
     echo ""
 }
 
@@ -219,6 +222,29 @@ deploy_subscription() {
             echo "  --member=serviceAccount:${PUSH_AUTH_SA} \\"
             echo "  --role=roles/run.invoker \\"
             echo "  --region=$REGION \\"
+            echo "  --project=$PROJECT_ID"
+        fi
+        if [ -n "$DEAD_LETTER_TOPIC" ]; then
+            echo ""
+            echo "Would also execute:"
+            echo "PROJECT_NUMBER=\$(gcloud projects describe $PROJECT_ID --format='value(projectNumber)')"
+            echo "PUBSUB_SA=\"service-\${PROJECT_NUMBER}@gcp-sa-pubsub.iam.gserviceaccount.com\""
+            echo "gcloud pubsub topics add-iam-policy-binding $DEAD_LETTER_TOPIC \\"
+            echo "  --member=serviceAccount:\${PUBSUB_SA} \\"
+            echo "  --role=roles/pubsub.publisher \\"
+            echo "  --project=$PROJECT_ID"
+        fi
+        if [ -n "$PUSH_AUTH_SA" ]; then
+            echo ""
+            echo "Would also execute:"
+            echo "gcloud pubsub topics add-iam-policy-binding $TOPIC_NAME \\"
+            echo "  --member=serviceAccount:${PUSH_AUTH_SA} \\"
+            echo "  --role=roles/pubsub.publisher \\"
+            echo "  --project=$PROJECT_ID"
+            echo ""
+            echo "gcloud pubsub subscriptions add-iam-policy-binding $SUBSCRIPTION_NAME \\"
+            echo "  --member=serviceAccount:${PUSH_AUTH_SA} \\"
+            echo "  --role=roles/pubsub.subscriber \\"
             echo "  --project=$PROJECT_ID"
         fi
         return 0
@@ -273,6 +299,71 @@ deploy_subscription() {
             else
                 print_warning "Failed to add IAM policy binding (subscription created successfully)"
                 print_warning "You may need to manually grant the 'roles/run.invoker' role to '${PUSH_AUTH_SA}' on service '$SERVICE_NAME'"
+            fi
+        fi
+        
+        # If dead letter topic is configured, grant Pub/Sub service account publisher role
+        if [ -n "$DEAD_LETTER_TOPIC" ]; then
+            echo ""
+            print_info "Granting IAM permissions to Pub/Sub service account for dead letter topic..."
+            
+            # Get project number from project ID
+            PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)' 2>/dev/null)
+            
+            if [ -z "$PROJECT_NUMBER" ]; then
+                print_warning "Failed to get project number for project '$PROJECT_ID'"
+                print_warning "Skipping dead letter topic IAM binding"
+            else
+                PUBSUB_SA="service-${PROJECT_NUMBER}@gcp-sa-pubsub.iam.gserviceaccount.com"
+                
+                gcloud pubsub topics add-iam-policy-binding "$DEAD_LETTER_TOPIC" \
+                    --member="serviceAccount:${PUBSUB_SA}" \
+                    --role="roles/pubsub.publisher" \
+                    --project="$PROJECT_ID"
+                
+                if [ $? -eq 0 ]; then
+                    print_success "Dead letter topic IAM policy binding added successfully!"
+                    print_info "Pub/Sub service account '${PUBSUB_SA}' can now publish to dead letter topic '$DEAD_LETTER_TOPIC'"
+                else
+                    print_warning "Failed to add IAM policy binding for dead letter topic (subscription created successfully)"
+                    print_warning "You may need to manually grant the 'roles/pubsub.publisher' role to '${PUBSUB_SA}' on topic '$DEAD_LETTER_TOPIC'"
+                fi
+            fi
+        fi
+        
+        # Grant publisher role on main topic using PUSH_AUTH_SA
+        if [ -n "$PUSH_AUTH_SA" ]; then
+            echo ""
+            print_info "Granting publisher role to service account on main topic..."
+            
+            gcloud pubsub topics add-iam-policy-binding "$TOPIC_NAME" \
+                --member="serviceAccount:${PUSH_AUTH_SA}" \
+                --role="roles/pubsub.publisher" \
+                --project="$PROJECT_ID"
+            
+            if [ $? -eq 0 ]; then
+                print_success "Topic publisher IAM policy binding added successfully!"
+                print_info "Service account '${PUSH_AUTH_SA}' can now publish to topic '$TOPIC_NAME'"
+            else
+                print_warning "Failed to add IAM policy binding for topic publisher (subscription created successfully)"
+            fi
+        fi
+        
+        # Grant subscriber role on subscription using PUSH_AUTH_SA
+        if [ -n "$PUSH_AUTH_SA" ]; then
+            echo ""
+            print_info "Granting subscriber role to service account on subscription..."
+            
+            gcloud pubsub subscriptions add-iam-policy-binding "$SUBSCRIPTION_NAME" \
+                --member="serviceAccount:${PUSH_AUTH_SA}" \
+                --role="roles/pubsub.subscriber" \
+                --project="$PROJECT_ID"
+            
+            if [ $? -eq 0 ]; then
+                print_success "Subscription subscriber IAM policy binding added successfully!"
+                print_info "Service account '${PUSH_AUTH_SA}' can now subscribe to '$SUBSCRIPTION_NAME'"
+            else
+                print_warning "Failed to add IAM policy binding for subscription subscriber (subscription created successfully)"
             fi
         fi
         
@@ -517,6 +608,9 @@ if deploy_subscription; then
     if [ -n "$DEAD_LETTER_TOPIC" ]; then
         echo -e "${BLUE}Dead Letter Topic:${NC} ${DEAD_LETTER_TOPIC}"
         echo -e "${BLUE}Max Delivery Attempts:${NC} ${MAX_DELIVERY_ATTEMPTS}"
+    fi
+    if [ -n "$PUSH_AUTH_SA" ]; then
+        echo -e "${BLUE}Topic Publisher & Subscriber Service Account:${NC} ${PUSH_AUTH_SA}"
     fi
     echo ""
     print_success "Subscription created successfully!"
