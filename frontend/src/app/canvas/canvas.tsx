@@ -1,15 +1,12 @@
 "use client";
 
-import { JSX, useEffect, useRef, useState, WheelEvent } from "react";
-import type { CanvasRef, Tool } from "react-pixel-art-canvas";
-import { useAppContext } from "../context/AppContext";
+import { useEffect, useRef, useState } from "react";
 import { CanvaPixel } from "./canva-pixel/canva-pixel";
 
 export function Canvas() {
   const [scale, setScale] = useState(1);
   const [position, setPosition] = useState({ x: 0, y: 0 });
 
-  // Pour savoir si on est en train de drag
   const isDraggingRef = useRef(false);
   const lastPosRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -34,7 +31,6 @@ export function Canvas() {
     });
   };
 
-  // Souris : drag
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
     isDraggingRef.current = true;
@@ -60,7 +56,6 @@ export function Canvas() {
     lastPosRef.current = null;
   };
 
-  // Touch : drag
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     if (e.touches.length !== 1) return;
     const touch = e.touches[0];
@@ -88,7 +83,6 @@ export function Canvas() {
     stopDragging();
   };
 
-  // Sécurité : si on lâche la souris en dehors du div
   useEffect(() => {
     const handleWindowMouseUp = () => stopDragging();
     window.addEventListener("mouseup", handleWindowMouseUp);
@@ -102,21 +96,21 @@ export function Canvas() {
 
   return (
     <div
-      className="w-screen h-screen overflow-hidden bg-black flex justify-center items-center"
+      className="w-screen h-screen overflow-hidden bg-black flex justify-center items-center cursor-grab active:cursor-grabbing select-none"
       onWheel={handleWheel}
+      onMouseDown={handleMouseDown} // 👈 drag commence partout
       onMouseMove={handleMouseMove}
       onMouseUp={stopDragging}
+      onTouchStart={handleTouchStart} // 👈 idem pour le tactile
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
       <div
-        onMouseDown={handleMouseDown}
-        onTouchStart={handleTouchStart}
         style={{
           transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
           transformOrigin: "center center",
         }}
-        className="justify-center flex items-center cursor-grab active:cursor-grabbing select-none"
+        className="flex justify-center items-center pointer-events-auto"
       >
         <CanvaPixel />
       </div>
