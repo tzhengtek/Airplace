@@ -321,6 +321,11 @@ deploy_subscription() {
                     --role="roles/pubsub.publisher" \
                     --project="$PROJECT_ID"
                 
+                gcloud pubsub topics add-iam-policy-binding "$DEAD_LETTER_TOPIC" \
+                    --member="serviceAccount:${PUBSUB_SA}" \
+                    --role="roles/pubsub.subscriber" \
+                    --project="$PROJECT_ID"
+
                 if [ $? -eq 0 ]; then
                     print_success "Dead letter topic IAM policy binding added successfully!"
                     print_info "Pub/Sub service account '${PUBSUB_SA}' can now publish to dead letter topic '$DEAD_LETTER_TOPIC'"

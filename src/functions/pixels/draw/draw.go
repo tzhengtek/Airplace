@@ -165,7 +165,7 @@ func drawPixel(w http.ResponseWriter, r *http.Request) {
 	// Save to Firestore
 	if err := savePixelToFirestore([]PixelInfo{pixelInfo}, projectId, firestoreDatabase); err != nil {
 		log.Printf("Error saving pixel: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		http.Error(w, "Internal Error", http.StatusBadRequest)
 		return
 	}
 
