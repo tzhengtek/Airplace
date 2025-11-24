@@ -551,18 +551,43 @@ if ask_yes_no "Do you want to configure a dead letter topic?" "y"; then
                 print_success "Dead letter topic '$DEAD_LETTER_TOPIC' found"
                 break
             else
-                print_error "Dead letter topic '$DEAD_LETTER_TOPIC' does not exist in project '$PROJECT_ID'"
-                print_info "Please create the topic first using: ./deploy-pubsub-topic.sh"
-                if ! ask_yes_no "Do you want to try another topic name?" "y"; then
-                    print_info "Dead letter topic configuration cancelled"
-                    DEAD_LETTER_TOPIC=""
-                    break
+                print_warning "Dead letter topic '$DEAD_LETTER_TOPIC' does not exist in project '$PROJECT_ID'"
+                if ask_yes_no "Do you want to create the dead letter topic '$DEAD_LETTER_TOPIC'?" "y"; then
+                    print_info "Creating dead letter topic: $DEAD_LETTER_TOPIC"
+                    gcloud pubsub topics create "$DEAD_LETTER_TOPIC" \
+                        --project="$PROJECT_ID"
+                    
+                    if [ $? -eq 0 ]; then
+                        print_success "Dead letter topic '$DEAD_LETTER_TOPIC' created successfully"
+                        break
+                    else
+                        print_error "Failed to create dead letter topic '$DEAD_LETTER_TOPIC'"
+                        if ! ask_yes_no "Do you want to try another topic name?" "y"; then
+                            print_info "Dead letter topic configuration cancelled"
+                            DEAD_LETTER_TOPIC=""
+                            break
+                        fi
+                        echo ""
+                    fi
+                else
+                    if ! ask_yes_no "Do you want to try another topic name?" "y"; then
+                        print_info "Dead letter topic configuration cancelled"
+                        DEAD_LETTER_TOPIC=""
+                        break
+                    fi
+                    echo ""
                 fi
-                echo ""
             fi
         else
-            # In dry-run mode, just accept the topic name
-            print_warning "[DRY RUN] Would check if dead letter topic '$DEAD_LETTER_TOPIC' exists"
+            # In dry-run mode, check if topic exists and show what would be created
+            if check_topic_exists "$DEAD_LETTER_TOPIC" "$PROJECT_ID" >/dev/null 2>&1; then
+                print_warning "[DRY RUN] Dead letter topic '$DEAD_LETTER_TOPIC' exists"
+            else
+                print_warning "[DRY RUN] Dead letter topic '$DEAD_LETTER_TOPIC' does not exist"
+                echo "Would execute:"
+                echo "gcloud pubsub topics create $DEAD_LETTER_TOPIC \\"
+                echo "  --project=$PROJECT_ID"
+            fi
             break
         fi
     done

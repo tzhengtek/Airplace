@@ -33,6 +33,13 @@ type PixelInfo struct {
 	Timestamp string `firestore:"timestamp" json:"timestamp"`
 }
 
+type ChunkData struct {
+	StartX int32          `firestore:"startX" json:"startX"`
+	StartY int32          `firestore:"startY" json:"startY"`
+	Size   int32          `firestore:"size" json:"size"`
+	Pixels map[string]any `firestore:"pixels" json:"pixels"`
+}
+
 func init() {
 	functions.HTTP("drawPixel", drawPixel)
 }
@@ -55,7 +62,7 @@ func processMessage(w http.ResponseWriter, r *http.Request) {
 	client, err := pubsub.NewClient(ctx, projectId)
 	if err != nil {
 		log.Printf("Error while creating PubSub client: %v", err)
-		http.Error(w, "Bad request", http.StatusBadRequest)
+		http.Error(w, "Bad request", http.StatusInternalServerError)
 		return
 	}
 	defer client.Close()
@@ -174,13 +181,6 @@ func drawPixel(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Pixel inserted successfully")
 }
 
-type ChunkData struct {
-	StartX int32 `firestore:"startX" json:"startX"`
-	StartY int32
-	Size   int32
-	Pixels []byte
-}
-
 func savePixelToFirestore(pixelInfo []PixelInfo, projectId string, firestoreDatabase string) error {
 	ctx := context.Background()
 	client, err := firestore.NewClientWithDatabase(ctx, projectId, firestoreDatabase)
@@ -196,11 +196,11 @@ func savePixelToFirestore(pixelInfo []PixelInfo, projectId string, firestoreData
 		localX := int(pixel.X) % chunkSize
 		localY := int(pixel.Y) % chunkSize
 		userID, err := strconv.ParseInt(pixel.User, 10, 64)
-		pixelKey := fmt.Sprintf("%d_%d", localX, localY)
-
 		if err != nil {
 			return fmt.Errorf("error parsing user ID: %w", err)
 		}
+		pixelKey := fmt.Sprintf("%d_%d", localX, localY)
+
 		chunkId := fmt.Sprintf("canvas_chunks_%d_%d", int(pixel.X)/chunkSize, int(pixel.Y)/chunkSize)
 		if chunkUpdates[chunkId] == nil {
 			chunkUpdates[chunkId] = map[string]any{
