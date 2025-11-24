@@ -94,8 +94,32 @@ list_services() {
     local region="$1"
     local project="$2"
     
-    print_info "Fetching existing Cloud Run services..."
-    gcloud run services list --region "$region" --project "$project" 2>/dev/null
+    print_info "Fetching existing Cloud Run services in region '$region'..."
+    echo ""
+    
+    # Get services with detailed information
+    local services_data=$(gcloud run services list \
+        --region "$region" \
+        --project "$project" \
+        --format="value(metadata.name,status.url)" 2>/dev/null)
+    
+    if [ -z "$services_data" ]; then
+        print_warning "No Cloud Run services found in region '$region'"
+        return 1
+    fi
+    
+    # Display formatted list
+    print_info "Available services in region '$region':"
+    echo ""
+    local count=1
+    while IFS=$'\t' read -r service_name url; do
+        if [ -n "$service_name" ]; then
+            printf "  ${GREEN}%2d)${NC} %-40s ${BLUE}%s${NC}\n" "$count" "$service_name" "$url"
+            count=$((count + 1))
+        fi
+    done <<< "$services_data"
+    echo ""
+    return 0
 }
 
 # Function to display deployment summary
@@ -108,6 +132,12 @@ show_summary() {
     echo -e "${BLUE}Project ID:${NC} $PROJECT_ID"
     if [ -n "$SERVICE_ACCOUNT_NAME" ]; then
         echo -e "${BLUE}Service Account:${NC} ${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+        if [ ${#SA_ROLES[@]} -gt 0 ]; then
+            echo -e "${BLUE}Service Account Roles:${NC}"
+            for role in "${SA_ROLES[@]}"; do
+                echo -e "  - ${role}"
+            done
+        fi
     fi
     if [ -n "$SECRET_NAME" ]; then
         echo -e "${BLUE}Secret:${NC} $SECRET_NAME"
@@ -231,6 +261,39 @@ deploy_service() {
                 sleep 10
             fi
         fi
+        
+        # Step 3b: Grant additional IAM roles to service account
+        if [ ${#SA_ROLES[@]} -gt 0 ] && [ -n "$SERVICE_ACCOUNT_NAME" ]; then
+            echo ""
+            print_info "Step 3b: Granting additional IAM roles to service account"
+            
+            for role in "${SA_ROLES[@]}"; do
+                if [ "$DRY_RUN" = true ]; then
+                    print_warning "[DRY RUN] Would grant role to service account"
+                    echo "gcloud projects add-iam-policy-binding ${PROJECT_ID} \\"
+                    echo "  --member=\"serviceAccount:${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com\" \\"
+                    echo "  --role=\"${role}\""
+                else
+                    print_info "Granting ${role} to service account..."
+                    gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+                        --member="serviceAccount:${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
+                        --role="$role"
+                    
+                    if [ $? -eq 0 ]; then
+                        print_success "Role granted: ${role}"
+                    else
+                        print_warning "Failed to grant role: ${role}"
+                    fi
+                fi
+            done
+            
+            # Wait for IAM propagation after granting roles
+            if [ "$DRY_RUN" = false ] && [ ${#SA_ROLES[@]} -gt 0 ]; then
+                echo ""
+                print_info "Waiting for IAM policy propagation..."
+                sleep 5
+            fi
+        fi
     fi
     
     # Deploy the service
@@ -263,6 +326,18 @@ deploy_service() {
             echo "  --set-env-vars $ENV_VARS \\"
         fi
         echo "  $ALLOW_UNAUTH"
+        
+        # Show service account roles that would be applied
+        if [ ${#SA_ROLES[@]} -gt 0 ] && [ -n "$SERVICE_ACCOUNT_NAME" ]; then
+            echo ""
+            echo "Would also grant IAM roles to service account:"
+            for role in "${SA_ROLES[@]}"; do
+                echo "gcloud projects add-iam-policy-binding $PROJECT_ID \\"
+                echo "  --member=\"serviceAccount:${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com\" \\"
+                echo "  --role=\"${role}\""
+            done
+        fi
+        
         return 0
     fi
     
@@ -325,6 +400,43 @@ deploy_service() {
             fi
         fi
         
+        # Step 6: Grant IAM roles to service account (for both new and update)
+        if [ ${#SA_ROLES[@]} -gt 0 ] && [ -n "$SERVICE_ACCOUNT_NAME" ]; then
+            echo ""
+            if [ "$is_update" = true ]; then
+                print_info "Step 6: Granting additional IAM roles to service account"
+            else
+                print_info "Step 6: Granting additional IAM roles to service account"
+            fi
+            
+            for role in "${SA_ROLES[@]}"; do
+                if [ "$DRY_RUN" = true ]; then
+                    print_warning "[DRY RUN] Would grant role to service account"
+                    echo "gcloud projects add-iam-policy-binding ${PROJECT_ID} \\"
+                    echo "  --member=\"serviceAccount:${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com\" \\"
+                    echo "  --role=\"${role}\""
+                else
+                    print_info "Granting ${role} to service account..."
+                    gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+                        --member="serviceAccount:${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" \
+                        --role="$role"
+                    
+                    if [ $? -eq 0 ]; then
+                        print_success "Role granted: ${role}"
+                    else
+                        print_warning "Failed to grant role: ${role}"
+                    fi
+                fi
+            done
+            
+            # Wait for IAM propagation after granting roles
+            if [ "$DRY_RUN" = false ] && [ ${#SA_ROLES[@]} -gt 0 ]; then
+                echo ""
+                print_info "Waiting for IAM policy propagation..."
+                sleep 5
+            fi
+        fi
+        
         # Fetch function URL
         echo ""
         print_info "Fetching service URL..."
@@ -370,7 +482,41 @@ PROJECT_ID="$CURRENT_PROJECT"
 print_info "Using GCP Project: $PROJECT_ID"
 echo ""
 
-# Ask deployment mode
+# Initialize arrays
+SA_ROLES=()
+
+# Get region first (default to europe-west1)
+DEFAULT_REGION="europe-west1"
+REGION=$(get_input "Enter deployment region" "$DEFAULT_REGION")
+echo ""
+
+# List all existing Cloud Run services in the region
+print_header "Existing Cloud Run Services"
+services_data=$(gcloud run services list \
+    --region "$REGION" \
+    --project "$PROJECT_ID" \
+    --format="value(metadata.name,status.url)" 2>/dev/null)
+
+if [ -z "$services_data" ]; then
+    print_warning "No Cloud Run services found in region '$REGION'"
+    echo ""
+    DEPLOYMENT_MODE="new"
+else
+    # Display numbered list of services
+    count=1
+    services_array=()
+    print_info "Available services in region '$REGION':"
+    echo ""
+    while IFS=$'\t' read -r service_name url; do
+        if [ -n "$service_name" ]; then
+            services_array+=("$service_name")
+            printf "  ${GREEN}%2d)${NC} %-40s ${BLUE}%s${NC}\n" "$count" "$service_name" "$url"
+            count=$((count + 1))
+        fi
+    done <<< "$services_data"
+    echo ""
+    
+    # Ask deployment mode
 echo "What would you like to do?"
 echo "1) Deploy a new Cloud Run service"
 echo "2) Update an existing Cloud Run service"
@@ -592,6 +738,82 @@ if [ "$DEPLOYMENT_MODE" = "new" ]; then
         done
     fi
     
+    # Service Account IAM Roles configuration
+    echo ""
+    print_info "Service Account IAM Roles Configuration"
+    print_info "Grant IAM roles to the service account (e.g., pubsub.publisher, storage.objectViewer, etc.)"
+    SA_ROLES=()
+    SA_ROLE_COUNT=0
+    
+    while true; do
+        SA_ROLE_COUNT=$((SA_ROLE_COUNT + 1))
+        echo ""
+        print_info "Common IAM roles for Cloud Run services:"
+        echo "  1) roles/pubsub.publisher (publish to Pub/Sub topics)"
+        echo "  2) roles/pubsub.subscriber (subscribe to Pub/Sub subscriptions)"
+        echo "  3) roles/storage.objectViewer (read Cloud Storage objects)"
+        echo "  4) roles/storage.objectCreator (create Cloud Storage objects)"
+        echo "  5) roles/storage.objectAdmin (full control of Cloud Storage objects)"
+        echo "  6) roles/bigquery.dataEditor (edit BigQuery data)"
+        echo "  7) roles/bigquery.jobUser (run BigQuery jobs)"
+        echo "  8) roles/firestore.user (access Firestore)"
+        echo "  9) roles/secretmanager.secretAccessor (access Secret Manager secrets)"
+        echo "  10) roles/logging.logWriter (write logs)"
+        echo "  11) Custom (enter your own role)"
+        echo "  12) Skip / Finish (no more roles)"
+        echo ""
+        
+        read -p "$(echo -e ${YELLOW}Select role [1-12]: ${NC})" role_option
+        
+        # If empty or 12, stop collecting roles
+        if [ -z "$role_option" ] || [ "$role_option" = "12" ]; then
+            if [ $SA_ROLE_COUNT -eq 1 ]; then
+                print_info "No additional IAM roles configured for service account"
+            else
+                print_success "Finished configuring service account IAM roles"
+            fi
+            break
+        fi
+        
+        SA_ROLE=""
+        case $role_option in
+            1) SA_ROLE="roles/pubsub.publisher";;
+            2) SA_ROLE="roles/pubsub.subscriber";;
+            3) SA_ROLE="roles/storage.objectViewer";;
+            4) SA_ROLE="roles/storage.objectCreator";;
+            5) SA_ROLE="roles/storage.objectAdmin";;
+            6) SA_ROLE="roles/bigquery.dataEditor";;
+            7) SA_ROLE="roles/bigquery.jobUser";;
+            8) SA_ROLE="roles/firestore.user";;
+            9) SA_ROLE="roles/secretmanager.secretAccessor";;
+            10) SA_ROLE="roles/logging.logWriter";;
+            11) 
+                SA_ROLE=$(get_input "Enter custom IAM role" "")
+                if [ -z "$SA_ROLE" ]; then
+                    print_error "Role cannot be empty"
+                    SA_ROLE_COUNT=$((SA_ROLE_COUNT - 1))
+                    continue
+                fi
+                ;;
+            *)
+                print_error "Invalid option. Please select 1-12."
+                SA_ROLE_COUNT=$((SA_ROLE_COUNT - 1))
+                continue
+                ;;
+        esac
+        
+        if [ -n "$SA_ROLE" ]; then
+            # Store the role
+            SA_ROLES+=("$SA_ROLE")
+            print_success "Added role: $SA_ROLE"
+        fi
+    done
+    
+    if [ ${#SA_ROLES[@]} -gt 0 ]; then
+        echo ""
+        print_success "Service account roles configured: ${#SA_ROLES[@]} role(s)"
+    fi
+    
     # API Gateway invoker configuration
     echo ""
     GATEWAY_SA=""
@@ -599,10 +821,120 @@ if [ "$DEPLOYMENT_MODE" = "new" ]; then
         GATEWAY_SA=$(get_input "Enter API Gateway service account email" "api-gateway-invoker@${PROJECT_ID}.iam.gserviceaccount.com")
     fi
 else
-    print_info "Updating existing service - service account will be preserved"
-    SERVICE_ACCOUNT_NAME=""
+    print_info "Updating existing service - retrieving current service account..."
+    
+    # Retrieve the existing service account from the Cloud Run service
+    if [ "$DRY_RUN" = false ]; then
+        EXISTING_SA=$(gcloud run services describe "$FUNCTION_NAME" \
+            --region "$REGION" \
+            --project="$PROJECT_ID" \
+            --format='value(spec.template.spec.serviceAccountName)' 2>/dev/null)
+        
+        if [ -n "$EXISTING_SA" ] && [ "$EXISTING_SA" != "default" ] && [ "$EXISTING_SA" != "${PROJECT_ID}@appspot.gserviceaccount.com" ]; then
+            # Extract service account name from email (e.g., "my-sa@project.iam.gserviceaccount.com" -> "my-sa")
+            # Handle both formats: "my-sa@project.iam.gserviceaccount.com" and just "my-sa"
+            if [[ "$EXISTING_SA" == *"@"* ]]; then
+                SERVICE_ACCOUNT_NAME=$(echo "$EXISTING_SA" | sed 's/@.*//')
+            else
+                SERVICE_ACCOUNT_NAME="$EXISTING_SA"
+            fi
+            print_success "Found existing service account: ${EXISTING_SA}"
+            echo ""
+        else
+            print_warning "No custom service account configured for this service (using default compute service account)"
+            echo ""
+            if ask_yes_no "Do you want to configure a service account for this service?" "n"; then
+                SERVICE_ACCOUNT_NAME=$(get_input "Enter service account name" "cloud-run-invoker")
+            else
+                SERVICE_ACCOUNT_NAME=""
+            fi
+        fi
+    else
+        print_warning "[DRY RUN] Would retrieve service account from existing service"
+        SERVICE_ACCOUNT_NAME=$(get_input "Enter service account name (or leave empty if none)" "")
+    fi
+    
     SECRET_NAME=""
     GATEWAY_SA=""
+    SA_ROLES=()
+    
+    # If we have a service account, ask about IAM roles
+    if [ -n "$SERVICE_ACCOUNT_NAME" ]; then
+        # Service Account IAM Roles configuration
+        echo ""
+        print_info "Service Account IAM Roles Configuration"
+        print_info "Grant additional IAM roles to the service account: ${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+        SA_ROLE_COUNT=0
+        
+        while true; do
+            SA_ROLE_COUNT=$((SA_ROLE_COUNT + 1))
+            echo ""
+            print_info "Common IAM roles for Cloud Run services:"
+            echo "  1) roles/pubsub.publisher (publish to Pub/Sub topics)"
+            echo "  2) roles/pubsub.subscriber (subscribe to Pub/Sub subscriptions)"
+            echo "  3) roles/storage.objectViewer (read Cloud Storage objects)"
+            echo "  4) roles/storage.objectCreator (create Cloud Storage objects)"
+            echo "  5) roles/storage.objectAdmin (full control of Cloud Storage objects)"
+            echo "  6) roles/bigquery.dataEditor (edit BigQuery data)"
+            echo "  7) roles/bigquery.jobUser (run BigQuery jobs)"
+            echo "  8) roles/firestore.user (access Firestore)"
+            echo "  9) roles/secretmanager.secretAccessor (access Secret Manager secrets)"
+            echo "  10) roles/logging.logWriter (write logs)"
+            echo "  11) Custom (enter your own role)"
+            echo "  12) Skip / Finish (no more roles)"
+            echo ""
+            
+            read -p "$(echo -e ${YELLOW}Select role [1-12]: ${NC})" role_option
+            
+            # If empty or 12, stop collecting roles
+            if [ -z "$role_option" ] || [ "$role_option" = "12" ]; then
+                if [ $SA_ROLE_COUNT -eq 1 ]; then
+                    print_info "No additional IAM roles configured for service account"
+                else
+                    print_success "Finished configuring service account IAM roles"
+                fi
+                break
+            fi
+            
+            SA_ROLE=""
+            case $role_option in
+                1) SA_ROLE="roles/pubsub.publisher";;
+                2) SA_ROLE="roles/pubsub.subscriber";;
+                3) SA_ROLE="roles/storage.objectViewer";;
+                4) SA_ROLE="roles/storage.objectCreator";;
+                5) SA_ROLE="roles/storage.objectAdmin";;
+                6) SA_ROLE="roles/bigquery.dataEditor";;
+                7) SA_ROLE="roles/bigquery.jobUser";;
+                8) SA_ROLE="roles/firestore.user";;
+                9) SA_ROLE="roles/secretmanager.secretAccessor";;
+                10) SA_ROLE="roles/logging.logWriter";;
+                11) 
+                    SA_ROLE=$(get_input "Enter custom IAM role" "")
+                    if [ -z "$SA_ROLE" ]; then
+                        print_error "Role cannot be empty"
+                        SA_ROLE_COUNT=$((SA_ROLE_COUNT - 1))
+                        continue
+                    fi
+                    ;;
+                *)
+                    print_error "Invalid option. Please select 1-12."
+                    SA_ROLE_COUNT=$((SA_ROLE_COUNT - 1))
+                    continue
+                    ;;
+            esac
+            
+            if [ -n "$SA_ROLE" ]; then
+                # Store the role
+                SA_ROLES+=("$SA_ROLE")
+                print_success "Added role: $SA_ROLE"
+            fi
+        done
+        
+        if [ ${#SA_ROLES[@]} -gt 0 ]; then
+            echo ""
+            print_success "Service account roles configured: ${#SA_ROLES[@]} role(s)"
+        fi
+    fi
 fi
 
 # Check authentication (always ask)
@@ -632,6 +964,12 @@ if deploy_service $([ "$DEPLOYMENT_MODE" = "update" ] && echo true || echo false
     print_header "Deployment Complete!"
     if [ -n "$SERVICE_ACCOUNT_NAME" ]; then
         echo -e "${BLUE}Service Account:${NC} ${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+        if [ ${#SA_ROLES[@]} -gt 0 ]; then
+            echo -e "${BLUE}Service Account Roles Granted:${NC}"
+            for role in "${SA_ROLES[@]}"; do
+                echo -e "  - ${role}"
+            done
+        fi
     fi
     echo -e "${BLUE}Function Name:${NC} ${FUNCTION_NAME}"
     echo -e "${BLUE}Region:${NC} ${REGION}"
@@ -642,4 +980,5 @@ if deploy_service $([ "$DEPLOYMENT_MODE" = "update" ] && echo true || echo false
 else
     print_error "Deployment failed. Please check the errors above."
     exit 1
+fi
 fi

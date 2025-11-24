@@ -106,7 +106,21 @@ fi
 
 # Substitute variables in the YAML file
 echo -e "${YELLOW}Generating api-config-deployed.yaml...${NC}"
-envsubst < api-config.yaml > api-config-deployed.yaml
+
+# Temporarily replace $ref with a placeholder to protect it from envsubst
+# Use a unique placeholder that won't appear in the actual content
+sed 's/\$ref/__REF_PLACEHOLDER__/g' api-config.yaml > api-config-temp.yaml
+
+# Now use envsubst to substitute only our variables
+# envsubst will substitute all ${VAR} patterns, but our $ref is now protected
+envsubst < api-config-temp.yaml > api-config-deployed.yaml
+
+# Restore $ref from the placeholder
+sed -i '' 's/__REF_PLACEHOLDER__/$ref/g' api-config-deployed.yaml 2>/dev/null || \
+sed -i 's/__REF_PLACEHOLDER__/$ref/g' api-config-deployed.yaml
+
+# Clean up temporary file
+rm -f api-config-temp.yaml
 
 if [ $? -eq 0 ]; then
     echo -e "${GREEN}✓ Successfully generated api-config-deployed.yaml${NC}\n"
@@ -167,7 +181,7 @@ else
     CONFIG_ID="config-1"
 fi
 
-echo ""
+echo "" 
 
 # Ask for Gateway ID
 read -p "Enter Gateway ID (name of your API Gateway): " GATEWAY_ID

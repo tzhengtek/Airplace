@@ -1,74 +1,161 @@
-swagger: "2.0"
+openapi: 3.0.4
 info:
   title: AirPlace - API Gateway
   description: AirPlace Gateway configuration
   version: 1.0.0
-schemes:
-  - https
-produces:
-  - application/json
+servers:
+  - url: https://
+    description: API Gateway server
+
+x-google-api-management:
+  backends:
+    proxy-interface-backend:
+      address: https://proxy-interface-hn2wtuxuha-ew.a.run.app
+      pathTranslation: APPEND_PATH_TO_ADDRESS
+      protocol: "http/1.1"
+    add-user-backend:
+      address: https://adduser-hn2wtuxuha-ew.a.run.app
+      pathTranslation: APPEND_PATH_TO_ADDRESS
+      protocol: "http/1.1"
+    discord-interactions-backend:
+      address: https://discord-interactions-hn2wtuxuha-ew.a.run.app
+      pathTranslation: APPEND_PATH_TO_ADDRESS
+      protocol: "http/1.1"
+
 paths:
   /v1/proxy-interface:
     post:
       summary: API proxy
       operationId: proxy
-      parameters:
-        - name: body
-          in: body
-          required: true
-          description: This endpoint accepts any valid JSON structure (object, array, string, number, or boolean).
-          schema:
-            # Setting 'type: object' with no 'properties' is the OAS 2.0 way to allow a flexible JSON payload.
-            type: object
-      x-google-backend:
-        # Standardized with no trailing slash
-        address: https://proxy-interface-hn2wtuxuha-ew.a.run.app
-        # address: https://proxymethod-hn2wtuxuha-ew.a.run.app
+      requestBody:
+        required: true
+        description: Api Gateway endpoint to proxy the request to the appropriate service.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Pixel"
+      x-google-backend: proxy-interface-backend
       responses:
         "200":
           description: A successful response
-          schema:
-            type: string
+          content:
+            application/json:
+              schema:
+                type: string
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
 
   /v1/add-user:
     post:
       summary: Add User
       operationId: addUser
-      parameters:
-        - name: body
-          in: body
-          required: true
-          description: This endpoint accepts any valid JSON structure (object, array, string, number, or boolean).
-          schema:
-            # Setting 'type: object' with no 'properties' is the OAS 2.0 way to allow a flexible JSON payload.
-            type: object
-      x-google-backend:
-        # Standardized with no trailing slash
-        address: https://adduser-hn2wtuxuha-ew.a.run.app
+      requestBody:
+        required: true
+        description: This endpoint accepts any valid JSON structure (object, array, string, number, or boolean).
+        content:
+          application/json:
+            schema:
+              type: object
+      x-google-backend: add-user-backend
       responses:
         "200":
           description: Succesful Response from discord
-          schema:
-            type: string
+          content:
+            application/json:
+              schema:
+                type: string
 
   /v1/discord/interactions:
     post:
       summary: Discord Implementation
       operationId: discord
-      parameters:
-        - name: body
-          in: body
-          required: true
-          description: This endpoint accepts any valid JSON structure (object, array, string, number, or boolean).
-          schema:
-            # Setting 'type: object' with no 'properties' is the OAS 2.0 way to allow a flexible JSON payload.
-            type: object
-      x-google-backend:
-        # Standardized with no trailing slash
-        address: https://discord-interactions-hn2wtuxuha-ew.a.run.app
-        # address: https://discord-interactions-hn2wtuxuha-ew.a.run.app
+      requestBody:
+        required: true
+        description: Discord interaction request body with type enum
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscordInteraction"
+      x-google-backend: discord-interactions-backend
       responses:
         "200":
           description: Succesful Response from discord
+          content:
+            application/json:
+              schema:
+                type: string
+
+components:
+  responses:
+    BadRequestError:
+      description: Invalid input provided
+      content:
+        application/json:
           schema:
-            type: string
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalServerError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Machine-readable error code
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          additionalProperties: true
+          description: Additional error context
+        timestamp:
+          type: string
+          format: date-time
+        traceId:
+          type: string
+          description: Unique identifier for error tracing
+    Pixel:
+      type: object
+      properties:
+        x:
+          type: integer
+          format: int32
+        y:
+          type: integer
+          format: int32
+        color:
+          type: integer
+          format: int32
+        user:
+          type: string
+          pattern: "^[0-9]{17,18}$"
+        timestamp:
+          type: string
+          format: date-time
+    DiscordInteraction:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: integer
+          enum:
+            - 1
+            - 2
+            - 3
+            - 4
+            - 5
+          description: |
+            Discord interaction type:
+            - 1: Ping
+            - 2: ApplicationCommand
+            - 3: MessageComponent
+            - 4: ApplicationCommandAutocomplete
+            - 5: ModalSubmit

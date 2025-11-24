@@ -181,20 +181,14 @@ show_summary() {
 
 # Function to deploy Pub/Sub subscription
 deploy_subscription() {
-    local is_update="$1"
+    print_header "Creating Pub/Sub Subscription"
     
-    if [ "$is_update" = true ]; then
-        print_header "Updating Pub/Sub Subscription"
-    else
-        print_header "Creating Pub/Sub Subscription"
-        
-        # Check if subscription already exists (only for create mode)
-        if check_subscription_exists "$SUBSCRIPTION_NAME" "$PROJECT_ID" >/dev/null 2>&1; then
-            print_warning "Subscription '$SUBSCRIPTION_NAME' already exists"
-            if ! ask_yes_no "Do you want to continue anyway?" "n"; then
-                print_info "Deployment cancelled"
-                return 1
-            fi
+    # Check if subscription already exists
+    if check_subscription_exists "$SUBSCRIPTION_NAME" "$PROJECT_ID" >/dev/null 2>&1; then
+        print_warning "Subscription '$SUBSCRIPTION_NAME' already exists"
+        if ! ask_yes_no "Do you want to continue anyway?" "n"; then
+            print_info "Deployment cancelled"
+            return 1
         fi
     fi
     
@@ -209,12 +203,8 @@ deploy_subscription() {
         print_warning "DRY RUN MODE - No actual deployment will occur"
         echo ""
         echo "Would execute:"
-        if [ "$is_update" = true ]; then
-            echo "gcloud pubsub subscriptions update $SUBSCRIPTION_NAME \\"
-        else
-            echo "gcloud pubsub subscriptions create $SUBSCRIPTION_NAME \\"
-            echo "  --topic=$TOPIC_NAME \\"
-        fi
+        echo "gcloud pubsub subscriptions create $SUBSCRIPTION_NAME \\"
+        echo "  --topic=$TOPIC_NAME \\"
         echo "  --ack-deadline=$ACK_DEADLINE \\"
         if [ -n "$PUSH_ENDPOINT" ]; then
             echo "  --push-endpoint=$PUSH_ENDPOINT \\"
@@ -260,17 +250,11 @@ deploy_subscription() {
         return 0
     fi
     
-    # Build the subscription command (create or update)
-    if [ "$is_update" = true ]; then
-        local create_cmd="gcloud pubsub subscriptions update \"$SUBSCRIPTION_NAME\" \
-            --ack-deadline=\"$ACK_DEADLINE\" \
-            --project=\"$PROJECT_ID\""
-    else
-        local create_cmd="gcloud pubsub subscriptions create \"$SUBSCRIPTION_NAME\" \
-            --topic=\"$TOPIC_NAME\" \
-            --ack-deadline=\"$ACK_DEADLINE\" \
-            --project=\"$PROJECT_ID\""
-    fi
+    # Build the subscription creation command
+    local create_cmd="gcloud pubsub subscriptions create \"$SUBSCRIPTION_NAME\" \
+        --topic=\"$TOPIC_NAME\" \
+        --ack-deadline=\"$ACK_DEADLINE\" \
+        --project=\"$PROJECT_ID\""
     
     # Add push endpoint if specified
     if [ -n "$PUSH_ENDPOINT" ]; then
@@ -284,20 +268,12 @@ deploy_subscription() {
         create_cmd="$create_cmd --max-delivery-attempts=\"$MAX_DELIVERY_ATTEMPTS\""
     fi
     
-    # Create or update the subscription
-    if [ "$is_update" = true ]; then
-        print_info "Updating Pub/Sub subscription: $SUBSCRIPTION_NAME"
-    else
-        print_info "Creating Pub/Sub subscription: $SUBSCRIPTION_NAME"
-    fi
+    # Create the subscription
+    print_info "Creating Pub/Sub subscription: $SUBSCRIPTION_NAME"
     eval $create_cmd
     
     if [ $? -eq 0 ]; then
-        if [ "$is_update" = true ]; then
-            print_success "Pub/Sub subscription updated successfully!"
-        else
-            print_success "Pub/Sub subscription created successfully!"
-        fi
+        print_success "Pub/Sub subscription created successfully!"
         
         # Fetch subscription details
         echo ""
@@ -429,31 +405,6 @@ echo ""
 list_subscriptions "$PROJECT_ID"
 echo ""
 
-# Ask deployment mode
-echo "What would you like to do?"
-echo "1) Create a new Pub/Sub subscription"
-echo "2) Update an existing Pub/Sub subscription"
-echo ""
-
-while true; do
-    read -p "$(echo -e ${YELLOW}Select option [1-2]: ${NC})" option
-    case $option in
-        1)
-            DEPLOYMENT_MODE="create"
-            break
-            ;;
-        2)
-            DEPLOYMENT_MODE="update"
-            break
-            ;;
-        *)
-            print_error "Invalid option. Please select 1 or 2."
-            ;;
-    esac
-done
-
-echo ""
-
 # Get subscription name
 SUBSCRIPTION_NAME=$(get_input "Enter subscription name" "")
 
@@ -468,42 +419,15 @@ if [[ ! "$SUBSCRIPTION_NAME" =~ ^[a-zA-Z0-9_-]+$ ]]; then
     exit 1
 fi
 
-# Check if subscription exists for update mode
-if [ "$DEPLOYMENT_MODE" = "update" ]; then
-    if ! check_subscription_exists "$SUBSCRIPTION_NAME" "$PROJECT_ID" >/dev/null 2>&1; then
-        print_warning "Subscription '$SUBSCRIPTION_NAME' not found in project '$PROJECT_ID'"
-        if ! ask_yes_no "Do you want to create it as a new subscription instead?" "y"; then
-            print_info "Deployment cancelled"
-            exit 0
-        fi
-        DEPLOYMENT_MODE="create"
-    else
-        print_success "Subscription '$SUBSCRIPTION_NAME' found"
-    fi
-else
-    # Check if subscription already exists for create mode
-    if check_subscription_exists "$SUBSCRIPTION_NAME" "$PROJECT_ID" >/dev/null 2>&1; then
-        print_warning "Subscription '$SUBSCRIPTION_NAME' already exists in project '$PROJECT_ID'"
-        if ask_yes_no "Do you want to update it instead?" "y"; then
-            DEPLOYMENT_MODE="update"
-        else
-            print_error "Please choose a different subscription name"
-            exit 1
-        fi
-    fi
-fi
-
 echo ""
 
-# Get topic name (only required for create mode)
-if [ "$DEPLOYMENT_MODE" = "create" ]; then
-    # List existing topics
-    list_topics "$PROJECT_ID"
-    echo ""
-    
-    # Get topic name and validate it exists
-    TOPIC_NAME=""
-    while true; do
+# List existing topics
+list_topics "$PROJECT_ID"
+echo ""
+
+# Get topic name and validate it exists
+TOPIC_NAME=""
+while true; do
     TOPIC_NAME=$(get_input "Enter topic name" "")
     
     if [ -z "$TOPIC_NAME" ]; then
@@ -518,77 +442,19 @@ if [ "$DEPLOYMENT_MODE" = "create" ]; then
             break
         else
             print_error "Topic '$TOPIC_NAME' does not exist in project '$PROJECT_ID'"
-            if ask_yes_no "Do you want to create this topic now?" "y"; then
-                echo ""
-                print_info "Creating topic: $TOPIC_NAME"
-                gcloud pubsub topics create "$TOPIC_NAME" --project="$PROJECT_ID"
-                
-                if [ $? -eq 0 ]; then
-                    print_success "Topic '$TOPIC_NAME' created successfully!"
-                    break
-                else
-                    print_error "Failed to create topic '$TOPIC_NAME'"
-                    if ! ask_yes_no "Do you want to try another topic name?" "y"; then
-                        print_info "Deployment cancelled"
-                        exit 0
-                    fi
-                    echo ""
-                fi
-            else
-                if ! ask_yes_no "Do you want to try another topic name?" "y"; then
-                    print_info "Deployment cancelled"
-                    exit 0
-                fi
-                echo ""
+            print_info "Please create the topic first using: ./deploy-pubsub-topic.sh"
+            if ! ask_yes_no "Do you want to try another topic name?" "y"; then
+                print_info "Deployment cancelled"
+                exit 0
             fi
+            echo ""
         fi
     else
-        # In dry-run mode, check if topic exists and offer to create
-        if check_topic_exists "$TOPIC_NAME" "$PROJECT_ID" >/dev/null 2>&1; then
-            print_warning "[DRY RUN] Topic '$TOPIC_NAME' exists"
-            break
-        else
-            print_warning "[DRY RUN] Topic '$TOPIC_NAME' does not exist"
-            if ask_yes_no "Would you like to create it? (will execute in real mode)" "y"; then
-                echo ""
-                print_info "Creating topic: $TOPIC_NAME"
-                gcloud pubsub topics create "$TOPIC_NAME" --project="$PROJECT_ID"
-                
-                if [ $? -eq 0 ]; then
-                    print_success "Topic '$TOPIC_NAME' created successfully!"
-                    break
-                else
-                    print_error "Failed to create topic '$TOPIC_NAME'"
-                    if ! ask_yes_no "Do you want to try another topic name?" "y"; then
-                        print_info "Deployment cancelled"
-                        exit 0
-                    fi
-                    echo ""
-                fi
-            else
-                if ! ask_yes_no "Do you want to try another topic name?" "y"; then
-                    print_info "Deployment cancelled"
-                    exit 0
-                fi
-                echo ""
-            fi
-        fi
+        # In dry-run mode, just accept the topic name
+        print_warning "[DRY RUN] Would check if topic '$TOPIC_NAME' exists"
+        break
     fi
-    done
-else
-    # For update mode, get the existing topic from the subscription
-    print_info "Fetching topic from existing subscription..."
-    TOPIC_NAME=$(gcloud pubsub subscriptions describe "$SUBSCRIPTION_NAME" \
-        --project="$PROJECT_ID" \
-        --format='value(topic)' 2>/dev/null | awk -F'/' '{print $NF}')
-    
-    if [ -z "$TOPIC_NAME" ]; then
-        print_error "Could not retrieve topic from subscription '$SUBSCRIPTION_NAME'"
-        exit 1
-    fi
-    
-    print_success "Found topic: $TOPIC_NAME"
-fi
+done
 
 echo ""
 
@@ -666,16 +532,13 @@ if ask_yes_no "Do you want to configure a dead letter topic?" "y"; then
     echo ""
     print_info "Dead Letter Topic Configuration"
     
-    # Default dead letter topic name is main topic name + '-dlq'
-    DEFAULT_DLQ_TOPIC="${TOPIC_NAME}-dlq"
-    
     # List existing topics
     list_topics "$PROJECT_ID"
     echo ""
     
     # Get dead letter topic name and validate it exists
     while true; do
-        DEAD_LETTER_TOPIC=$(get_input "Enter dead letter topic name" "$DEFAULT_DLQ_TOPIC")
+        DEAD_LETTER_TOPIC=$(get_input "Enter dead letter topic name" "")
         
         if [ -z "$DEAD_LETTER_TOPIC" ]; then
             print_error "Dead letter topic name cannot be empty"
@@ -689,65 +552,18 @@ if ask_yes_no "Do you want to configure a dead letter topic?" "y"; then
                 break
             else
                 print_error "Dead letter topic '$DEAD_LETTER_TOPIC' does not exist in project '$PROJECT_ID'"
-                if ask_yes_no "Do you want to create this dead letter topic now?" "y"; then
-                    echo ""
-                    print_info "Creating dead letter topic: $DEAD_LETTER_TOPIC"
-                    gcloud pubsub topics create "$DEAD_LETTER_TOPIC" --project="$PROJECT_ID"
-                    
-                    if [ $? -eq 0 ]; then
-                        print_success "Dead letter topic '$DEAD_LETTER_TOPIC' created successfully!"
-                        break
-                    else
-                        print_error "Failed to create dead letter topic '$DEAD_LETTER_TOPIC'"
-                        if ! ask_yes_no "Do you want to try another topic name?" "y"; then
-                            print_info "Dead letter topic configuration cancelled"
-                            DEAD_LETTER_TOPIC=""
-                            break
-                        fi
-                        echo ""
-                    fi
-                else
-                    if ! ask_yes_no "Do you want to try another topic name?" "y"; then
-                        print_info "Dead letter topic configuration cancelled"
-                        DEAD_LETTER_TOPIC=""
-                        break
-                    fi
-                    echo ""
+                print_info "Please create the topic first using: ./deploy-pubsub-topic.sh"
+                if ! ask_yes_no "Do you want to try another topic name?" "y"; then
+                    print_info "Dead letter topic configuration cancelled"
+                    DEAD_LETTER_TOPIC=""
+                    break
                 fi
+                echo ""
             fi
         else
-            # In dry-run mode, check if topic exists and offer to create
-            if check_topic_exists "$DEAD_LETTER_TOPIC" "$PROJECT_ID" >/dev/null 2>&1; then
-                print_warning "[DRY RUN] Dead letter topic '$DEAD_LETTER_TOPIC' exists"
-                break
-            else
-                print_warning "[DRY RUN] Dead letter topic '$DEAD_LETTER_TOPIC' does not exist"
-                if ask_yes_no "Would you like to create it? (will execute in real mode)" "y"; then
-                    echo ""
-                    print_info "Creating dead letter topic: $DEAD_LETTER_TOPIC"
-                    gcloud pubsub topics create "$DEAD_LETTER_TOPIC" --project="$PROJECT_ID"
-                    
-                    if [ $? -eq 0 ]; then
-                        print_success "Dead letter topic '$DEAD_LETTER_TOPIC' created successfully!"
-                        break
-                    else
-                        print_error "Failed to create dead letter topic '$DEAD_LETTER_TOPIC'"
-                        if ! ask_yes_no "Do you want to try another topic name?" "y"; then
-                            print_info "Dead letter topic configuration cancelled"
-                            DEAD_LETTER_TOPIC=""
-                            break
-                        fi
-                        echo ""
-                    fi
-                else
-                    if ! ask_yes_no "Do you want to try another topic name?" "y"; then
-                        print_info "Dead letter topic configuration cancelled"
-                        DEAD_LETTER_TOPIC=""
-                        break
-                    fi
-                    echo ""
-                fi
-            fi
+            # In dry-run mode, just accept the topic name
+            print_warning "[DRY RUN] Would check if dead letter topic '$DEAD_LETTER_TOPIC' exists"
+            break
         fi
     done
     
@@ -774,11 +590,7 @@ if ask_yes_no "Do you want to configure a dead letter topic?" "y"; then
 fi
 
 # Show summary and confirm
-if [ "$DEPLOYMENT_MODE" = "update" ]; then
-    show_summary "Update Existing Subscription"
-else
-    show_summary "Create New Subscription"
-fi
+show_summary "Create New Subscription"
 
 # Final confirmation
 if ! ask_yes_no "Proceed with subscription creation?" "y"; then
@@ -787,7 +599,7 @@ if ! ask_yes_no "Proceed with subscription creation?" "y"; then
 fi
 
 # Deploy the subscription
-if deploy_subscription $([ "$DEPLOYMENT_MODE" = "update" ] && echo true || echo false); then
+if deploy_subscription; then
     echo ""
     print_header "Deployment Complete!"
     echo -e "${BLUE}Project ID:${NC} ${PROJECT_ID}"
@@ -806,11 +618,7 @@ if deploy_subscription $([ "$DEPLOYMENT_MODE" = "update" ] && echo true || echo 
         echo -e "${BLUE}Topic Publisher & Subscriber Service Account:${NC} ${PUSH_AUTH_SA}"
     fi
     echo ""
-    if [ "$DEPLOYMENT_MODE" = "update" ]; then
-        print_success "Subscription updated successfully!"
-    else
-        print_success "Subscription created successfully!"
-    fi
+    print_success "Subscription created successfully!"
     echo ""
 else
     print_error "Deployment failed. Please check the errors above."
