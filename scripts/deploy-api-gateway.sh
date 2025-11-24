@@ -268,7 +268,7 @@ if [ "$DEPLOYMENT_FAILED" = false ]; then
     echo -e "${GREEN}gcloud api-gateway api-configs create \"$CONFIG_ID\" \\${NC}"
     echo -e "${GREEN}    --api=\"$API_ID\" \\${NC}"
     echo -e "${GREEN}    --openapi-spec=api-config-deployed.yaml \\${NC}"
-    echo -e "${GREEN}    --backend-auth-service-account=$BACKEND_SERVICE_ACCOUNT \\${NC}"
+    echo -e "${GREEN}    --backend-auth-service-account=\"$BACKEND_SERVICE_ACCOUNT\" \\${NC}"
     echo -e "${GREEN}    --project=\"$PROJECT_ID\"${NC}"
     echo ""
     
