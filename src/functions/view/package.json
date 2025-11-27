@@ -1,10 +1,10 @@
 {
-  "name": "cloudstorage-function",
+  "name": "view-make-function",
   "version": "1.0.0",
   "type": "module",
   "main": "index.js",
   "scripts": {
-    "start": "functions-framework --target=snapshot-make"
+    "start": "functions-framework --target=view-make"
   },
   "engines": {
     "node": "22.21.1"
@@ -14,6 +14,7 @@
     "@google-cloud/pubsub": "^5.2.0",
     "@google-cloud/storage": "^6.9.0",
     "@napi-rs/canvas": "*",
-    "firebase-admin": "^13.6.0"
+    "firebase-admin": "^13.6.0",
+    "sharp": "^0.34.5"
   }
 }

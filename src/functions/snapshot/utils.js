@@ -87,3 +87,18 @@ function hexToRgba(hex) {
     a: 255
   };
 }
+
+export async function resetSubscriptionBacklog() {
+  const subscriberAdmin = new pubsubV1.SubscriberClient();
+
+  const formatted = subscriberAdmin.subscriptionPath(projectId, subscriptionName);
+  const now = {
+    seconds: Math.floor(Date.now() / 1000),
+    nanos: 0
+  };
+  await subscriberAdmin.seek({
+    subscription: formatted,
+    time: now
+  });
+  console.log("[snapshot-make] backlog ignored, new messages will continue to stream normally");
+}
