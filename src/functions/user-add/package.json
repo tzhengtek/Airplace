@@ -1,0 +1,17 @@
+{
+  "name": "user-create-function",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "functions-framework --target=user-create"
+  },
+  "engines": {
+    "node": "22.21.1"
+  },
+  "dependencies": {
+    "@google-cloud/functions-framework": "^3.5.1",
+    "@google-cloud/pubsub": "^5.2.0",
+    "firebase-admin": "^13.6.0"
+  }
+}
