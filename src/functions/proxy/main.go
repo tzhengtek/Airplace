@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,6 +9,7 @@ import (
 	"os"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	"cloud.google.com/go/pubsub/v2"
 )
 
@@ -18,7 +17,6 @@ func main() {
 	log.Printf("Starting Proxy server...")
 	http.HandleFunc("POST /pixel-draw", publishDraw)
 	http.HandleFunc("POST /pixel-update", publishUpdate)
-	http.HandleFunc("/temporal", temporal)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -49,54 +47,6 @@ type PixelInfo struct {
 	Timestamp string `json:"timestamp"`
 }
 
-func temporal(w http.ResponseWriter, r *http.Request) {
-	body, err := io.ReadAll(r.Body)
-	if err != nil {
-		log.Printf("Error while reading the request body: %v", err)
-		http.Error(w, "Failed to read request body", http.StatusBadRequest)
-		return
-	}
-	defer r.Body.Close()
-
-	// Simulate what Pub/Sub does: base64 encode the data
-	base64Data := base64.StdEncoding.EncodeToString(body)
-	log.Printf("Base64 encoded data: %s", base64Data)
-
-	// Create Pub/Sub message format (simulating Pub/Sub push)
-	pubsubMsg := PubSubMessage{}
-	pubsubMsg.Message.Data = base64Data
-	pubsubMsg.Message.MessageID = fmt.Sprintf("msg-%d", time.Now().Unix())
-	pubsubMsg.Message.Attributes = map[string]string{
-		"source": "test",
-		"type":   "pixel_draw",
-	}
-	pubsubMsg.Subscription = "projects/serveless-epitech-dev/subscriptions/pixel.draw"
-
-	// Convert to JSON
-	jsonData, err := json.Marshal(pubsubMsg)
-	if err != nil {
-		log.Printf("Failed to marshal JSON: %v", err)
-		http.Error(w, "Failed to marshal", http.StatusInternalServerError)
-		return
-	}
-
-	// Send HTTP request to draw service
-	url := "http://localhost:8080/"
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		log.Printf("Failed to send request: %v", err)
-		http.Error(w, "Failed to send request", http.StatusInternalServerError)
-		return
-	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-	log.Printf("Response: %s", string(respBody))
-
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "Test message sent successfully")
-}
-
 func publishUpdate(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Publish Update function...")
 	ctx := r.Context()
@@ -123,7 +73,54 @@ func publishUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Received body: %s", body)
+	var pixelInfo PixelInfo
+	if err := json.Unmarshal(body, &pixelInfo); err != nil {
+		log.Printf("Error while deserialize pixel info from body: %v", err)
+		http.Error(w, "Bad Request: invalid body", http.StatusBadRequest)
+		return
+	}
+
+	// Check rate limit: retrieve user document and compare lastupdated with current time
+	firestoreClient, err := firestore.NewClientWithDatabase(ctx, projectId, "serverless-epitech-firestore")
+	if err != nil {
+		log.Printf("Error creating Firestore client: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer firestoreClient.Close()
+
+	// Retrieve user document by ID (PixelInfo.User)
+	userDoc, err := firestoreClient.Collection("users").Doc(pixelInfo.User).Get(ctx)
+	if err != nil {
+		log.Printf("Error retrieving user document: %v", err)
+		// If document doesn't exist, allow the request (first time user)
+		log.Printf("User document not found, allowing request")
+	} else {
+		// Get lastupdated field
+		lastUpdated, ok := userDoc.Data()["lastupdated"]
+		if ok {
+			var lastUpdatedTime time.Time
+			switch v := lastUpdated.(type) {
+			case time.Time:
+				lastUpdatedTime = v
+			case *time.Time:
+				if v != nil {
+					lastUpdatedTime = *v
+				}
+			default:
+				log.Printf("Unexpected type for lastupdated: %T, value: %v", v, v)
+			}
+
+			if !lastUpdatedTime.IsZero() {
+				timeDiff := time.Since(lastUpdatedTime)
+				if timeDiff < 300*time.Second {
+					log.Printf("Rate limit exceeded: last update was %v ago (limit: 300s)", timeDiff)
+					http.Error(w, "Not allowed: rate limit exceeded", http.StatusForbidden)
+					return
+				}
+			}
+		}
+	}
 
 	topic := c.Publisher("pixel.draw")
 	topic.PublishSettings = pubsub.PublishSettings{

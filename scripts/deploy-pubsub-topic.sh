@@ -129,6 +129,9 @@ deploy_topic() {
     
     # Create the topic
     print_info "Creating Pub/Sub topic: $TOPIC_ID"
+    echo "Executing:"
+    echo "gcloud pubsub topics create \"$TOPIC_ID\" \\"
+    echo "  --project=\"$PROJECT_ID\""
     gcloud pubsub topics create "$TOPIC_ID" \
         --project="$PROJECT_ID"
     
