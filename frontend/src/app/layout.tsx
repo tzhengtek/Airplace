@@ -4,9 +4,7 @@ import { Dropdown } from "./dropdown/dropdown";
 import { Canvas } from "./canvas/canvas";
 import { AppProvider } from "./context/AppContext";
 import { ColorPanel } from "@/app/canvas/color-panel/color-panel";
-
 import "./globals.css";
-import { CanvaPixel } from "./canvas/canva-pixel/canva-pixel";
 import { ColorCoord } from "./canvas/canva-coord/canva-coord";
 
 const geistSans = Geist({

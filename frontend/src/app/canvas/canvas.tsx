@@ -97,7 +97,6 @@ export function Canvas() {
       clampPosition(prev.x + dx, prev.y + dy, canvasScale)
     );
 
-    // Marque comme "drag" si on dépasse un petit déplacement
     if (dragStartRef.current) {
       const totalDx = e.clientX - dragStartRef.current.x;
       const totalDy = e.clientY - dragStartRef.current.y;
@@ -227,7 +226,7 @@ export function Canvas() {
       animateViewTo(targetX, targetY, TARGET_SCALE);
       setShouldZoom(false);
     }
-  }, [shouldZoom, targetPixel, animateViewTo, canvasScale]); // animateViewTo est inclus comme dépendance
+  }, [shouldZoom, targetPixel, animateViewTo, canvasScale]);
 
   const handleCanvasClick = (e: MouseEvent<HTMLDivElement>) => {
     const canvas = canvasRef.current;

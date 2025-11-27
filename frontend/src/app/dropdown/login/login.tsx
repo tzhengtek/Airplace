@@ -1,21 +1,22 @@
 "use client";
 
-import React from "react";
 import { Dialog, DialogPanel, DialogTitle, Button } from "@headlessui/react";
 import { X } from "lucide-react";
 import { useAppContext } from "@/app/context/AppContext";
-import { signIn } from "@/lib/api/auth-client";
 
 export function Login() {
   const { isLoginOpen, setIsLoginOpen } = useAppContext();
 
   const handleDiscordLogin = async () => {
-    console.log("Starting Discord login...");
-    await signIn.social({
-      provider: "discord",
-      callbackURL: window.location.pathname,
-      errorCallbackURL: window.location.pathname,
+    const params = new URLSearchParams({
+      client_id: process.env.NEXT_PUBLIC_CLIENT_ID || "",
+      redirect_uri: process.env.NEXT_PUBLIC_REDIRECT_URI || "",
+      response_type: "code",
+      scope: "identify email",
     });
+    window.location.assign(
+      `https://discord.com/api/oauth2/authorize?${params.toString()}`
+    );
   };
 
   return (
