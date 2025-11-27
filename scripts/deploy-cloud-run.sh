@@ -828,20 +828,19 @@ if [ "$DEPLOYMENT_MODE" = "new" ]; then
         echo "  4) roles/pubsub.editor              – Can modify Pub/Sub topics and subscriptions."
         echo "  5) roles/storage.objectViewer       – Read-only access to Cloud Storage objects."
         echo "  6) roles/storage.objectCreator      – Can upload new objects to Cloud Storage."
-        echo "  7) roles/firestore.user             – Read/write access to Firestore (native mode)."
-        echo "  8) roles/datastore.user             – Read/write access to Firestore in Datastore mode."
-        echo "  9) roles/logging.logWriter          – Write logs to Cloud Logging."
-        echo "  10) roles/secretmanager.secretAccessor – Read access to secrets from Secret Manager."
-        echo "  11) roles/eventarc.eventReceiver    – Allows receiving Eventarc events."
-        echo "  12) roles/run.invoker               – Allows invoking Cloud Run services."
-        echo "  13) Custom (enter your own role)"
-        echo "  14) Skip / Finish (no more roles)"
+        echo "  7) roles/datastore.user             – Read/write access to Firestore in Datastore mode."
+        echo "  8) roles/logging.logWriter          – Write logs to Cloud Logging."
+        echo "  9) roles/secretmanager.secretAccessor – Read access to secrets from Secret Manager."
+        echo "  10) roles/eventarc.eventReceiver    – Allows receiving Eventarc events."
+        echo "  11) roles/run.invoker               – Allows invoking Cloud Run services."
+        echo "  12) Custom (enter your own role)"
+        echo "  13) Skip / Finish (no more roles)"
         echo ""
         
-        read -p "$(echo -e ${YELLOW}Select role [1-14]: ${NC})" role_option
+        read -p "$(echo -e ${YELLOW}Select role [1-13]: ${NC})" role_option
         
-        # If empty or 14, stop collecting roles
-        if [ -z "$role_option" ] || [ "$role_option" = "14" ]; then
+        # If empty or 13, stop collecting roles
+        if [ -z "$role_option" ] || [ "$role_option" = "13" ]; then
             if [ $SA_ROLE_COUNT -eq 1 ]; then
                 print_info "No additional IAM roles configured for service account"
             else
@@ -858,13 +857,12 @@ if [ "$DEPLOYMENT_MODE" = "new" ]; then
             4) SA_ROLE="roles/pubsub.editor";;
             5) SA_ROLE="roles/storage.objectViewer";;
             6) SA_ROLE="roles/storage.objectCreator";;
-            7) SA_ROLE="roles/firestore.user";;
-            8) SA_ROLE="roles/datastore.user";;
-            9) SA_ROLE="roles/logging.logWriter";;
-            10) SA_ROLE="roles/secretmanager.secretAccessor";;
-            11) SA_ROLE="roles/eventarc.eventReceiver";;
-            12) SA_ROLE="roles/run.invoker";;
-            13) 
+            7) SA_ROLE="roles/datastore.user";;
+            8) SA_ROLE="roles/logging.logWriter";;
+            9) SA_ROLE="roles/secretmanager.secretAccessor";;
+            10) SA_ROLE="roles/eventarc.eventReceiver";;
+            11) SA_ROLE="roles/run.invoker";;
+            12) 
                 SA_ROLE=$(get_input "Enter custom IAM role" "")
                 if [ -z "$SA_ROLE" ]; then
                     print_error "Role cannot be empty"
@@ -873,7 +871,7 @@ if [ "$DEPLOYMENT_MODE" = "new" ]; then
                 fi
                 ;;
             *)
-                print_error "Invalid option. Please select 1-14."
+                print_error "Invalid option. Please select 1-13."
                 SA_ROLE_COUNT=$((SA_ROLE_COUNT - 1))
                 continue
                 ;;

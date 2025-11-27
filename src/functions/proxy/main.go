@@ -80,7 +80,6 @@ func publishUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check rate limit: retrieve user document and compare lastupdated with current time
 	firestoreClient, err := firestore.NewClientWithDatabase(ctx, projectId, "serverless-epitech-firestore")
 	if err != nil {
 		log.Printf("Error creating Firestore client: %v", err)
@@ -89,15 +88,12 @@ func publishUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	defer firestoreClient.Close()
 
-	// Retrieve user document by ID (PixelInfo.User)
 	userDoc, err := firestoreClient.Collection("users").Doc(pixelInfo.User).Get(ctx)
 	if err != nil {
 		log.Printf("Error retrieving user document: %v", err)
-		// If document doesn't exist, allow the request (first time user)
 		log.Printf("User document not found, allowing request")
 	} else {
-		// Get lastupdated field
-		lastUpdated, ok := userDoc.Data()["lastupdated"]
+		lastUpdated, ok := userDoc.Data()["lastUpdated"]
 		if ok {
 			var lastUpdatedTime time.Time
 			switch v := lastUpdated.(type) {
@@ -110,7 +106,6 @@ func publishUpdate(w http.ResponseWriter, r *http.Request) {
 			default:
 				log.Printf("Unexpected type for lastupdated: %T, value: %v", v, v)
 			}
-
 			if !lastUpdatedTime.IsZero() {
 				timeDiff := time.Since(lastUpdatedTime)
 				if timeDiff < 300*time.Second {
@@ -141,15 +136,6 @@ func publishUpdate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to publish message", http.StatusInternalServerError)
 		return
 	}
-
-	// pubsubMsg.Subscription = "projects/serveless-epitech-dev/subscriptions/pixel.draw"
-
-	// msgID, err := res.Get(ctx)
-	// if err != nil {
-	// 	log.Printf("Error publishing message: %v", err)
-	// 	http.Error(w, "Failed to publish message", http.StatusInternalServerError)
-	// 	return
-	// }
 
 	log.Printf("Message published successfully with ID: %s", msgId)
 	w.WriteHeader(http.StatusOK)

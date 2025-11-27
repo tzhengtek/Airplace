@@ -41,14 +41,12 @@ func resetPixel(ctx context.Context, e event.Event) error {
 }
 
 func seekAllSubscriptionsToNow(ctx context.Context, topicName string) error {
-	// High‑level client for listing topic subscriptions.
 	client, err := pubsub.NewClient(ctx, projectID)
 	if err != nil {
 		return fmt.Errorf("pubsub.NewClient: %v", err)
 	}
 	defer client.Close()
 
-	// Low‑level admin client for Seek.
 	subAdmin, err := pubsubadmin.NewSubscriptionAdminClient(ctx)
 	if err != nil {
 		return fmt.Errorf("apiv1.NewSubscriptionAdminClient: %v", err)
@@ -71,7 +69,6 @@ func seekAllSubscriptionsToNow(ctx context.Context, topicName string) error {
 			return fmt.Errorf("error listing topic subscriptions: %w", err)
 		}
 
-		// subName is already the fully‑qualified subscription name string.
 		log.Printf("Seeking subscription %s to %v", subName, now.AsTime())
 
 		_, err = subAdmin.Seek(ctx, &adminpb.SeekRequest{

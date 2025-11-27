@@ -10,8 +10,10 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"cloud.google.com/go/firestore"
+	"cloud.google.com/go/pubsub/v2"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 )
 
@@ -39,11 +41,16 @@ type ChunkData struct {
 	Pixels map[string]any `firestore:"pixels" json:"pixels"`
 }
 
+type UserInfo struct {
+	UserID string `firestore:"userID" json:"userID"`
+}
+
 var (
 	projectId         string
 	firestoreDatabase string
 	chunkSizeEnv      string
 	topicID           string
+	addUserTopicID    string
 )
 
 func init() {
@@ -51,12 +58,12 @@ func init() {
 	firestoreDatabase = os.Getenv("FIRESTORE_DATABASE")
 	chunkSizeEnv = os.Getenv("CHUNK_SIZE")
 	topicID = os.Getenv("PIXEL_UPDATE_TOPIC")
+	addUserTopicID = os.Getenv("ADD_USER_TOPIC")
 
 	functions.HTTP("drawPixel", drawPixel)
 }
 
 func drawPixel(w http.ResponseWriter, r *http.Request) {
-
 	if projectId == "" || firestoreDatabase == "" || chunkSizeEnv == "" || topicID == "" {
 		http.Error(w, "Environement variable are not set", http.StatusInternalServerError)
 		return
@@ -128,6 +135,21 @@ func savePixelToFirestore(pixelInfo []PixelInfo, projectId string, firestoreData
 	}
 	defer client.Close()
 
+	c, err := pubsub.NewClient(ctx, projectId)
+	if err != nil {
+		log.Printf("Error while retrieving Gcloud Profile: %v", err)
+		return fmt.Errorf("error connecting to PubSub: %w", err)
+	}
+	defer c.Close()
+
+	topic := c.Publisher(addUserTopicID)
+	topic.PublishSettings = pubsub.PublishSettings{
+		CountThreshold: 10,
+		DelayThreshold: 100 * time.Millisecond,
+		ByteThreshold:  1e6,
+	}
+	defer topic.Stop()
+
 	chunkUpdates := make(map[string]map[string]any)
 	for _, pixel := range pixelInfo {
 		localX := int(pixel.X) % chunkSize
@@ -138,13 +160,20 @@ func savePixelToFirestore(pixelInfo []PixelInfo, projectId string, firestoreData
 		}
 		pixelKey := fmt.Sprintf("%d_%d", localX, localY)
 
-		chunkId := fmt.Sprintf("canvas_chunks_%d_%d", int(pixel.X)/chunkSize, int(pixel.Y)/chunkSize)
-		if _, err := client.Collection("users").Doc(pixel.User).Set(ctx, map[string]any{
-			"lastupdated": firestore.ServerTimestamp,
-		}); err != nil {
-			log.Printf("error queuing user document: %v", err)
+		body, err := json.Marshal(UserInfo{
+			UserID: pixel.User,
+		})
+		if err != nil {
+			return fmt.Errorf("error marshalling user info: %w", err)
+		}
+		if _, err := topic.Publish(ctx, &pubsub.Message{
+			Data: body,
+		}).Get(ctx); err != nil {
+			log.Printf("error publishing message: %v", err)
 			continue
 		}
+
+		chunkId := fmt.Sprintf("canvas_chunks_%d_%d", int(pixel.X)/chunkSize, int(pixel.Y)/chunkSize)
 		if chunkUpdates[chunkId] == nil {
 			chunkUpdates[chunkId] = map[string]any{
 				"size": int32(chunkSize),
