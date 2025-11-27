@@ -312,7 +312,7 @@ deploy_service() {
         echo "  --source $SOURCE_DIR \\"
         echo "  --base-image $BASE_IMAGE \\"
         echo "  --region $REGION \\"
-        if [ -n "$SERVICE_ACCOUNT_NAME" ]; then
+        if [ -n "$SERVICE_ACCOUNT_NAME" ] && [ "$is_update" = false ]; then
             echo "  --service-account ${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com \\"
         fi
         echo "  --project=$PROJECT_ID \\"
@@ -323,7 +323,18 @@ deploy_service() {
             echo "  --function $ENTRYPOINT \\"
         fi
         if [ -n "$ENV_VARS" ]; then
-            echo "  --set-env-vars $ENV_VARS \\"
+            if [ "$is_update" = true ]; then
+                echo "  --update-env-vars $ENV_VARS \\"
+            else
+                echo "  --set-env-vars $ENV_VARS \\"
+            fi
+        fi
+        if [ -n "$SECRET_NAME" ] && [ -n "$SECRET_ENV_KEY" ]; then
+            if [ "$is_update" = true ]; then
+                echo "  --update-secrets ${SECRET_ENV_KEY}=${SECRET_NAME}:latest \\"
+            else
+                echo "  --set-secrets ${SECRET_ENV_KEY}=${SECRET_NAME}:latest \\"
+            fi
         fi
         echo "  $ALLOW_UNAUTH"
         
@@ -348,6 +359,7 @@ deploy_service() {
         --region \"$REGION\" \
         --project=\"$PROJECT_ID\" \
         --cpu-boost \
+        --timeout=600 \
         --execution-environment gen1 \
         --min-instances \"$MIN_INSTANCES\" \
         $ALLOW_UNAUTH"
@@ -359,15 +371,59 @@ deploy_service() {
     
     # Add environment variables if specified
     if [ -n "$ENV_VARS" ]; then
-        deploy_cmd="$deploy_cmd --set-env-vars \"$ENV_VARS\""
+        if [ "$is_update" = true ]; then
+            deploy_cmd="$deploy_cmd --update-env-vars \"$ENV_VARS\""
+        else
+            deploy_cmd="$deploy_cmd --set-env-vars \"$ENV_VARS\""
+        fi
+    fi
+    
+    # Add secret environment variable if specified
+    if [ -n "$SECRET_NAME" ] && [ -n "$SECRET_ENV_KEY" ]; then
+        if [ "$is_update" = true ]; then
+            deploy_cmd="$deploy_cmd --update-secrets \"${SECRET_ENV_KEY}=${SECRET_NAME}:latest\""
+        else
+            deploy_cmd="$deploy_cmd --set-secrets \"${SECRET_ENV_KEY}=${SECRET_NAME}:latest\""
+        fi
     fi
     
     # Add service account only for new deployments
-    if [ -n "$SERVICE_ACCOUNT_NAME" ]; then
+    if [ -n "$SERVICE_ACCOUNT_NAME" ] && [ "$is_update" = false ]; then
         deploy_cmd="$deploy_cmd --service-account \"${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com\""
     fi
     
     # Execute deployment
+    echo "Executing:"
+    echo "gcloud run deploy \"$FUNCTION_NAME\" \\"
+    echo "  --source \"$SOURCE_DIR\" \\"
+    echo "  --base-image \"$BASE_IMAGE\" \\"
+    echo "  --region \"$REGION\" \\"
+    echo "  --project=\"$PROJECT_ID\" \\"
+    echo "  --cpu-boost \\"
+    echo "  --timeout=600 \\"
+    echo "  --execution-environment gen1 \\"
+    echo "  --min-instances \"$MIN_INSTANCES\""
+    if [ -n "$ENTRYPOINT" ]; then
+        echo "  --function \"$ENTRYPOINT\""
+    fi
+    if [ -n "$ENV_VARS" ]; then
+        if [ "$is_update" = true ]; then
+            echo "  --update-env-vars \"$ENV_VARS\""
+        else
+            echo "  --set-env-vars \"$ENV_VARS\""
+        fi
+    fi
+    if [ -n "$SECRET_NAME" ] && [ -n "$SECRET_ENV_KEY" ]; then
+        if [ "$is_update" = true ]; then
+            echo "  --update-secrets \"${SECRET_ENV_KEY}=${SECRET_NAME}:latest\""
+        else
+            echo "  --set-secrets \"${SECRET_ENV_KEY}=${SECRET_NAME}:latest\""
+        fi
+    fi
+    if [ -n "$SERVICE_ACCOUNT_NAME" ] && [ "$is_update" = false ]; then
+        echo "  --service-account \"${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com\""
+    fi
+    echo "  $ALLOW_UNAUTH"
     eval $deploy_cmd
     
     if [ $? -eq 0 ]; then
@@ -485,12 +541,12 @@ echo ""
 # Initialize arrays
 SA_ROLES=()
 
-# Get region first (default to europe-west1)
+# 1) Ask region
 DEFAULT_REGION="europe-west1"
 REGION=$(get_input "Enter deployment region" "$DEFAULT_REGION")
 echo ""
 
-# List all existing Cloud Run services in the region
+# 2) Fetch and display all existing Cloud Run services in the region
 print_header "Existing Cloud Run Services"
 services_data=$(gcloud run services list \
     --region "$REGION" \
@@ -516,43 +572,35 @@ else
     done <<< "$services_data"
     echo ""
     
-    # Ask deployment mode
-echo "What would you like to do?"
-echo "1) Deploy a new Cloud Run service"
-echo "2) Update an existing Cloud Run service"
+    # 3) Ask deployment mode (new or update)
+    echo "What would you like to do?"
+    echo "1) Deploy a new Cloud Run service"
+    echo "2) Update an existing Cloud Run service"
+    echo ""
+
+    while true; do
+        read -p "$(echo -e ${YELLOW}Select option [1-2]: ${NC})" option
+        case $option in
+            1)
+                DEPLOYMENT_MODE="new"
+                break
+                ;;
+            2)
+                DEPLOYMENT_MODE="update"
+                break
+                ;;
+            *)
+                print_error "Invalid option. Please select 1 or 2."
+                ;;
+        esac
+    done
+fi
+
 echo ""
 
-while true; do
-    read -p "$(echo -e ${YELLOW}Select option [1-2]: ${NC})" option
-    case $option in
-        1)
-            DEPLOYMENT_MODE="new"
-            break
-            ;;
-        2)
-            DEPLOYMENT_MODE="update"
-            break
-            ;;
-        *)
-            print_error "Invalid option. Please select 1 or 2."
-            ;;
-    esac
-done
-
-echo ""
-
-# Get region (default to europe-west1)
-DEFAULT_REGION="europe-west1"
-REGION=$(get_input "Enter deployment region" "$DEFAULT_REGION")
-
-# Handle deployment mode
+# 4) Handle deployment mode
 if [ "$DEPLOYMENT_MODE" = "update" ]; then
-    # List existing services
-    echo ""
-    list_services "$REGION" "$PROJECT_ID"
-    echo ""
-    
-    # Get service name to update
+    # Get service name to update (from the list already shown above)
     FUNCTION_NAME=$(get_input "Enter the Cloud Run service name to update" "")
     
     if [ -z "$FUNCTION_NAME" ]; then
@@ -572,7 +620,7 @@ if [ "$DEPLOYMENT_MODE" = "update" ]; then
         print_success "Service '$FUNCTION_NAME' found"
     fi
 else
-    # Get new service name
+    # New service: ask for basic parameters
     FUNCTION_NAME=$(get_input "Enter Cloud Run service name" "")
     
     if [ -z "$FUNCTION_NAME" ]; then
@@ -594,11 +642,20 @@ fi
 
 echo ""
 
-# Get deployment parameters
-SOURCE_DIR=$(get_input "Enter source directory path" ".")
+# For both new and update, ask deployment parameters in a clear order:
+# entrypoint, base image, source, instances, env vars.
 
-# Base image selection with suggestions
-echo ""
+# Entrypoint configuration (required)
+ENTRYPOINT=""
+while [ -z "$ENTRYPOINT" ]; do
+    ENTRYPOINT=$(get_input "Enter entrypoint command" "")
+    if [ -z "$ENTRYPOINT" ]; then
+        print_error "Entrypoint cannot be empty. Please provide a command."
+    else
+        print_success "Entrypoint set to: $ENTRYPOINT"
+    fi
+done
+
 print_info "Base Image Selection"
 echo "Common options:"
 echo "  1) nodejs22 (lightweight, latest)"
@@ -638,23 +695,34 @@ done
 print_success "Selected base image: $BASE_IMAGE"
 echo ""
 
-MIN_INSTANCES=$(get_input "Enter minimum instances" "1")
+# Source directory
+SOURCE_DIR=$(get_input "Enter source directory path" ".")
 
-# Entrypoint configuration (required)
-echo ""
-ENTRYPOINT=""
-while [ -z "$ENTRYPOINT" ]; do
-    ENTRYPOINT=$(get_input "Enter entrypoint command" "")
-    if [ -z "$ENTRYPOINT" ]; then
-        print_error "Entrypoint cannot be empty. Please provide a command."
-    else
-        print_success "Entrypoint set to: $ENTRYPOINT"
+# Minimum instances (show existing on update if possible)
+DEFAULT_MIN="1"
+if [ "$DEPLOYMENT_MODE" = "update" ] && [ "$DRY_RUN" = false ]; then
+    EXISTING_MIN=$(gcloud run services describe "$FUNCTION_NAME" \
+        --region "$REGION" \
+        --project="$PROJECT_ID" \
+        --format="value(spec.template.metadata.annotations[\"autoscaling.knative.dev/minScale\"])" 2>/dev/null)
+    if [ -n "$EXISTING_MIN" ]; then
+        DEFAULT_MIN="$EXISTING_MIN"
+        print_info "Current minimum instances for '$FUNCTION_NAME': $EXISTING_MIN"
     fi
-done
+fi
+MIN_INSTANCES=$(get_input "Enter minimum instances" "$DEFAULT_MIN")
 
 # Environment variables configuration
 echo ""
 print_info "Environment Variables Configuration"
+if [ "$DEPLOYMENT_MODE" = "update" ]; then
+    print_info "Existing environment variables for service '$FUNCTION_NAME':"
+    gcloud run services describe "$FUNCTION_NAME" \
+        --region "$REGION" \
+        --project="$PROJECT_ID" \
+        --format="yaml(spec.template.spec.containers[0].env)" 2>/dev/null || print_warning "Could not retrieve existing environment variables"
+    echo ""
+fi
 print_info "Enter environment variables. Leave KEY empty to finish."
 ENV_VARS=""
 ENV_COUNT=0
@@ -667,7 +735,7 @@ while true; do
     # If KEY is empty, stop collecting environment variables
     if [ -z "$ENV_KEY" ]; then
         if [ $ENV_COUNT -eq 1 ]; then
-            print_info "No environment variables configured"
+            print_info "No additional environment variables configured"
         else
             print_success "Finished configuring environment variables"
         fi
@@ -707,6 +775,7 @@ if [ "$DEPLOYMENT_MODE" = "new" ]; then
     # Secret configuration (optional)
     echo ""
     SECRET_NAME=""
+    SECRET_ENV_KEY=""
     if ask_yes_no "Do you need to use a Secret?" "n"; then
         while true; do
             SECRET_NAME=$(get_input "Enter the Secret name" "")
@@ -738,10 +807,14 @@ if [ "$DEPLOYMENT_MODE" = "new" ]; then
         done
     fi
     
+    if [ -n "$SECRET_NAME" ]; then
+        SECRET_ENV_KEY=$(get_input "Enter environment variable name to expose this secret (leave empty to only configure IAM)" "")
+    fi
+    
     # Service Account IAM Roles configuration
     echo ""
     print_info "Service Account IAM Roles Configuration"
-    print_info "Grant IAM roles to the service account (e.g., pubsub.publisher, storage.objectViewer, etc.)"
+    print_info "Grant IAM roles to the service account"
     SA_ROLES=()
     SA_ROLE_COUNT=0
     
@@ -749,24 +822,26 @@ if [ "$DEPLOYMENT_MODE" = "new" ]; then
         SA_ROLE_COUNT=$((SA_ROLE_COUNT + 1))
         echo ""
         print_info "Common IAM roles for Cloud Run services:"
-        echo "  1) roles/pubsub.publisher (publish to Pub/Sub topics)"
-        echo "  2) roles/pubsub.subscriber (subscribe to Pub/Sub subscriptions)"
-        echo "  3) roles/storage.objectViewer (read Cloud Storage objects)"
-        echo "  4) roles/storage.objectCreator (create Cloud Storage objects)"
-        echo "  5) roles/storage.objectAdmin (full control of Cloud Storage objects)"
-        echo "  6) roles/bigquery.dataEditor (edit BigQuery data)"
-        echo "  7) roles/bigquery.jobUser (run BigQuery jobs)"
-        echo "  8) roles/firestore.user (access Firestore)"
-        echo "  9) roles/secretmanager.secretAccessor (access Secret Manager secrets)"
-        echo "  10) roles/logging.logWriter (write logs)"
-        echo "  11) Custom (enter your own role)"
-        echo "  12) Skip / Finish (no more roles)"
+        echo "  1) roles/pubsub.publisher           – Can publish messages to Pub/Sub topics."
+        echo "  2) roles/pubsub.subscriber          – Can pull and consume Pub/Sub messages."
+        echo "  3) roles/pubsub.viewer              – Read-only access to Pub/Sub topics and subscriptions."
+        echo "  4) roles/pubsub.editor              – Can modify Pub/Sub topics and subscriptions."
+        echo "  5) roles/storage.objectViewer       – Read-only access to Cloud Storage objects."
+        echo "  6) roles/storage.objectCreator      – Can upload new objects to Cloud Storage."
+        echo "  7) roles/firestore.user             – Read/write access to Firestore (native mode)."
+        echo "  8) roles/datastore.user             – Read/write access to Firestore in Datastore mode."
+        echo "  9) roles/logging.logWriter          – Write logs to Cloud Logging."
+        echo "  10) roles/secretmanager.secretAccessor – Read access to secrets from Secret Manager."
+        echo "  11) roles/eventarc.eventReceiver    – Allows receiving Eventarc events."
+        echo "  12) roles/run.invoker               – Allows invoking Cloud Run services."
+        echo "  13) Custom (enter your own role)"
+        echo "  14) Skip / Finish (no more roles)"
         echo ""
         
-        read -p "$(echo -e ${YELLOW}Select role [1-12]: ${NC})" role_option
+        read -p "$(echo -e ${YELLOW}Select role [1-14]: ${NC})" role_option
         
-        # If empty or 12, stop collecting roles
-        if [ -z "$role_option" ] || [ "$role_option" = "12" ]; then
+        # If empty or 14, stop collecting roles
+        if [ -z "$role_option" ] || [ "$role_option" = "14" ]; then
             if [ $SA_ROLE_COUNT -eq 1 ]; then
                 print_info "No additional IAM roles configured for service account"
             else
@@ -779,15 +854,17 @@ if [ "$DEPLOYMENT_MODE" = "new" ]; then
         case $role_option in
             1) SA_ROLE="roles/pubsub.publisher";;
             2) SA_ROLE="roles/pubsub.subscriber";;
-            3) SA_ROLE="roles/storage.objectViewer";;
-            4) SA_ROLE="roles/storage.objectCreator";;
-            5) SA_ROLE="roles/storage.objectAdmin";;
-            6) SA_ROLE="roles/bigquery.dataEditor";;
-            7) SA_ROLE="roles/bigquery.jobUser";;
-            8) SA_ROLE="roles/firestore.user";;
-            9) SA_ROLE="roles/secretmanager.secretAccessor";;
-            10) SA_ROLE="roles/logging.logWriter";;
-            11) 
+            3) SA_ROLE="roles/pubsub.viewer";;
+            4) SA_ROLE="roles/pubsub.editor";;
+            5) SA_ROLE="roles/storage.objectViewer";;
+            6) SA_ROLE="roles/storage.objectCreator";;
+            7) SA_ROLE="roles/firestore.user";;
+            8) SA_ROLE="roles/datastore.user";;
+            9) SA_ROLE="roles/logging.logWriter";;
+            10) SA_ROLE="roles/secretmanager.secretAccessor";;
+            11) SA_ROLE="roles/eventarc.eventReceiver";;
+            12) SA_ROLE="roles/run.invoker";;
+            13) 
                 SA_ROLE=$(get_input "Enter custom IAM role" "")
                 if [ -z "$SA_ROLE" ]; then
                     print_error "Role cannot be empty"
@@ -796,7 +873,7 @@ if [ "$DEPLOYMENT_MODE" = "new" ]; then
                 fi
                 ;;
             *)
-                print_error "Invalid option. Please select 1-12."
+                print_error "Invalid option. Please select 1-14."
                 SA_ROLE_COUNT=$((SA_ROLE_COUNT - 1))
                 continue
                 ;;
@@ -843,20 +920,66 @@ else
         else
             print_warning "No custom service account configured for this service (using default compute service account)"
             echo ""
-            if ask_yes_no "Do you want to configure a service account for this service?" "n"; then
-                SERVICE_ACCOUNT_NAME=$(get_input "Enter service account name" "cloud-run-invoker")
-            else
-                SERVICE_ACCOUNT_NAME=""
-            fi
+            SERVICE_ACCOUNT_NAME=""
         fi
     else
         print_warning "[DRY RUN] Would retrieve service account from existing service"
-        SERVICE_ACCOUNT_NAME=$(get_input "Enter service account name (or leave empty if none)" "")
+        SERVICE_ACCOUNT_NAME=""
     fi
     
     SECRET_NAME=""
+    SECRET_ENV_KEY=""
     GATEWAY_SA=""
     SA_ROLES=()
+    
+    # Secret configuration (optional for update – show existing config first)
+    echo ""
+    print_info "Secret Configuration (existing service)"
+    print_info "Current service configuration (including environment and secret references):"
+    if [ "$DRY_RUN" = false ]; then
+        gcloud run services describe "$FUNCTION_NAME" \
+            --region "$REGION" \
+            --project="$PROJECT_ID" \
+            --format="yaml(spec.template.spec.containers[0].env,spec.template.spec.containers[0].envFrom)" 2>/dev/null || \
+        print_warning "Could not retrieve existing secret / env configuration"
+    else
+        print_warning "[DRY RUN] Would display existing secret and environment configuration for service '$FUNCTION_NAME'"
+    fi
+    echo ""
+    if ask_yes_no "Do you want to add or update a Secret binding?" "n"; then
+        while true; do
+            SECRET_NAME=$(get_input "Enter the Secret name" "")
+            
+            if [ -z "$SECRET_NAME" ]; then
+                print_warning "Secret name is empty"
+                if ask_yes_no "Do you want to skip secret binding?" "y"; then
+                    SECRET_NAME=""
+                    break
+                fi
+            else
+                # Validate secret exists (skip in dry-run mode)
+                if [ "$DRY_RUN" = false ]; then
+                    if ! gcloud secrets describe "$SECRET_NAME" --project="$PROJECT_ID" &>/dev/null; then
+                        print_error "Secret '$SECRET_NAME' does not exist in project"
+                        if ! ask_yes_no "Do you want to enter a different secret name?" "y"; then
+                            SECRET_NAME=""
+                            break
+                        fi
+                    else
+                        print_success "Secret '$SECRET_NAME' found"
+                        break
+                    fi
+                else
+                    print_warning "DRY-RUN MODE: Skipping secret existence check"
+                    break
+                fi
+            fi
+        done
+        
+        if [ -n "$SECRET_NAME" ]; then
+            SECRET_ENV_KEY=$(get_input "Enter environment variable name to expose this secret (leave empty to only configure IAM)" "")
+        fi
+    fi
     
     # If we have a service account, ask about IAM roles
     if [ -n "$SERVICE_ACCOUNT_NAME" ]; then
@@ -864,30 +987,43 @@ else
         echo ""
         print_info "Service Account IAM Roles Configuration"
         print_info "Grant additional IAM roles to the service account: ${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+        if [ "$DRY_RUN" = false ]; then
+            echo ""
+            print_info "Existing IAM roles for this service account (project-level):"
+            gcloud projects get-iam-policy "$PROJECT_ID" \
+                --flatten="bindings[]" \
+                --format="table(bindings.role)" \
+                --filter="bindings.members:serviceAccount:${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com" 2>/dev/null || \
+            print_warning "Could not retrieve existing IAM roles for service account"
+        else
+            print_warning "[DRY RUN] Would display existing IAM roles for service account ${SERVICE_ACCOUNT_NAME}@${PROJECT_ID}.iam.gserviceaccount.com"
+        fi
         SA_ROLE_COUNT=0
         
         while true; do
             SA_ROLE_COUNT=$((SA_ROLE_COUNT + 1))
             echo ""
             print_info "Common IAM roles for Cloud Run services:"
-            echo "  1) roles/pubsub.publisher (publish to Pub/Sub topics)"
-            echo "  2) roles/pubsub.subscriber (subscribe to Pub/Sub subscriptions)"
-            echo "  3) roles/storage.objectViewer (read Cloud Storage objects)"
-            echo "  4) roles/storage.objectCreator (create Cloud Storage objects)"
-            echo "  5) roles/storage.objectAdmin (full control of Cloud Storage objects)"
-            echo "  6) roles/bigquery.dataEditor (edit BigQuery data)"
-            echo "  7) roles/bigquery.jobUser (run BigQuery jobs)"
-            echo "  8) roles/firestore.user (access Firestore)"
-            echo "  9) roles/secretmanager.secretAccessor (access Secret Manager secrets)"
-            echo "  10) roles/logging.logWriter (write logs)"
-            echo "  11) Custom (enter your own role)"
-            echo "  12) Skip / Finish (no more roles)"
+            echo "  1) roles/pubsub.publisher           – Can publish messages to Pub/Sub topics."
+            echo "  2) roles/pubsub.subscriber          – Can pull and consume Pub/Sub messages."
+            echo "  3) roles/pubsub.viewer              – Read-only access to Pub/Sub topics and subscriptions."
+            echo "  4) roles/pubsub.editor              – Can modify Pub/Sub topics and subscriptions."
+            echo "  5) roles/storage.objectViewer       – Read-only access to Cloud Storage objects."
+            echo "  6) roles/storage.objectCreator      – Can upload new objects to Cloud Storage."
+            echo "  7) roles/firestore.user             – Read/write access to Firestore (native mode)."
+            echo "  8) roles/datastore.user             – Read/write access to Firestore in Datastore mode."
+            echo "  9) roles/logging.logWriter          – Write logs to Cloud Logging."
+            echo "  10) roles/secretmanager.secretAccessor – Read access to secrets from Secret Manager."
+            echo "  11) roles/eventarc.eventReceiver    – Allows receiving Eventarc events."
+            echo "  12) roles/run.invoker               – Allows invoking Cloud Run services."
+            echo "  13) Custom (enter your own role)"
+            echo "  14) Skip / Finish (no more roles)"
             echo ""
             
-            read -p "$(echo -e ${YELLOW}Select role [1-12]: ${NC})" role_option
+            read -p "$(echo -e ${YELLOW}Select role [1-14]: ${NC})" role_option
             
-            # If empty or 12, stop collecting roles
-            if [ -z "$role_option" ] || [ "$role_option" = "12" ]; then
+            # If empty or 14, stop collecting roles
+            if [ -z "$role_option" ] || [ "$role_option" = "14" ]; then
                 if [ $SA_ROLE_COUNT -eq 1 ]; then
                     print_info "No additional IAM roles configured for service account"
                 else
@@ -900,15 +1036,17 @@ else
             case $role_option in
                 1) SA_ROLE="roles/pubsub.publisher";;
                 2) SA_ROLE="roles/pubsub.subscriber";;
-                3) SA_ROLE="roles/storage.objectViewer";;
-                4) SA_ROLE="roles/storage.objectCreator";;
-                5) SA_ROLE="roles/storage.objectAdmin";;
-                6) SA_ROLE="roles/bigquery.dataEditor";;
-                7) SA_ROLE="roles/bigquery.jobUser";;
-                8) SA_ROLE="roles/firestore.user";;
-                9) SA_ROLE="roles/secretmanager.secretAccessor";;
-                10) SA_ROLE="roles/logging.logWriter";;
-                11) 
+                3) SA_ROLE="roles/pubsub.viewer";;
+                4) SA_ROLE="roles/pubsub.editor";;
+                5) SA_ROLE="roles/storage.objectViewer";;
+                6) SA_ROLE="roles/storage.objectCreator";;
+                7) SA_ROLE="roles/firestore.user";;
+                8) SA_ROLE="roles/datastore.user";;
+                9) SA_ROLE="roles/logging.logWriter";;
+                10) SA_ROLE="roles/secretmanager.secretAccessor";;
+                11) SA_ROLE="roles/eventarc.eventReceiver";;
+                12) SA_ROLE="roles/run.invoker";;
+                13) 
                     SA_ROLE=$(get_input "Enter custom IAM role" "")
                     if [ -z "$SA_ROLE" ]; then
                         print_error "Role cannot be empty"
@@ -917,7 +1055,7 @@ else
                     fi
                     ;;
                 *)
-                    print_error "Invalid option. Please select 1-12."
+                    print_error "Invalid option. Please select 1-14."
                     SA_ROLE_COUNT=$((SA_ROLE_COUNT - 1))
                     continue
                     ;;
@@ -980,5 +1118,4 @@ if deploy_service $([ "$DEPLOYMENT_MODE" = "update" ] && echo true || echo false
 else
     print_error "Deployment failed. Please check the errors above."
     exit 1
-fi
 fi
