@@ -1,0 +1,8 @@
+
+> cloudstorage-function@1.0.0 start
+> functions-framework --target=snapshot-make
+
+Serving function...
+Function: snapshot-make
+Signature type: http
+URL: http://localhost:8080/
