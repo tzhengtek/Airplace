@@ -1,7 +1,20 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useState,
+  ReactNode,
+  useEffect,
+} from "react";
 import { GRID_SIZE } from "../../constants/constants";
+import {
+  CanvasState,
+  saveCanvasState,
+  loadCanvasState,
+  PixelData,
+  clearCanvasState,
+} from "@/utils/canvasStorage";
 
 export type Point = { x: number; y: number };
 export type Coord = { x: number; y: number; zoom: number };
@@ -29,6 +42,9 @@ type AppContextType = {
   setTargetPixel: (
     position: Coord | null | ((prev: Coord | null) => Coord | null)
   ) => void;
+  pixels: PixelData[];
+  addPixel: (pixel: PixelData) => void;
+  resetCanvas: () => void;
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -47,6 +63,54 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [canvasScale, setCanvasScale] = useState<number>(0.5);
   const [shouldZoom, setShouldZoom] = useState(false);
   const [targetPixel, setTargetPixel] = useState<Coord | null>(null);
+  const [pixels, setPixels] = useState<PixelData[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    const savedState = loadCanvasState();
+    if (savedState) {
+      setPixels(savedState.pixels);
+      setSelectedColor(savedState.selectedColor);
+      setCanvasPosition(savedState.canvasPosition);
+      setCanvasScale(savedState.canvasScale);
+    }
+    setIsLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isLoaded) return;
+
+    const state: CanvasState = {
+      pixels,
+      canvasPosition,
+      canvasScale,
+      selectedColor,
+    };
+    saveCanvasState(state);
+  }, [pixels, canvasPosition, canvasScale, selectedColor, isLoaded]);
+
+  const addPixel = (pixel: PixelData) => {
+    setPixels((prevPixels) => {
+      const existingIndex = prevPixels.findIndex(
+        (p) => p.x === pixel.x && p.y === pixel.y
+      );
+      if (existingIndex >= 0) {
+        const newPixels = [...prevPixels];
+        newPixels[existingIndex] = pixel;
+        return newPixels;
+      }
+      return [...prevPixels, pixel];
+    });
+  };
+
+  const resetCanvas = () => {
+    clearCanvasState();
+    setPixels([]);
+    setCanvasPosition({ x: 0, y: 0 });
+    setCanvasScale(0.5);
+    setSelectedColor("#000000");
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -70,6 +134,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setShouldZoom,
         targetPixel,
         setTargetPixel,
+        pixels,
+        addPixel,
+        resetCanvas,
       }}
     >
       {children}
@@ -80,7 +147,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 export function useAppContext(): AppContextType {
   const ctx = useContext(AppContext);
   if (!ctx) {
-    throw new Error("useAppContext doit être utilisé dans un <AppProvider>");
+    throw new Error("useAppContext must be used within an <AppProvider>");
   }
   return ctx;
 }

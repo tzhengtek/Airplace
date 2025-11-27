@@ -6,11 +6,16 @@ import {
   DialogPanel,
   DialogTitle,
 } from "@headlessui/react";
-import { X } from "lucide-react";
+import { X, RotateCcw } from "lucide-react";
 import { useAppContext } from "@/app/context/AppContext";
 
 export function Settings() {
-  const { isSettingsOpen, setIsSettingsOpen } = useAppContext();
+  const { isSettingsOpen, setIsSettingsOpen, resetCanvas } = useAppContext();
+
+  const handleReset = () => {
+    resetCanvas();
+    setIsSettingsOpen(false);
+  };
 
   return (
     <Dialog
@@ -31,7 +36,13 @@ export function Settings() {
           </div>
           <div className="mt-6">
             <Description as="div" className="text-gray-700 flex flex-col gap-4">
-              <div>Nothing here... Not yet 😄</div>
+              <button
+                onClick={handleReset}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors duration-300 font-semibold"
+              >
+                <RotateCcw className="w-5 h-5" />
+                Reset Canvas
+              </button>
             </Description>
           </div>
         </DialogPanel>

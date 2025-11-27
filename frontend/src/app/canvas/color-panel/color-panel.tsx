@@ -1,15 +1,30 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { CircleCheck, CircleX } from "lucide-react";
 import { COLORS_PANEL } from "@/constants/constants";
 import { useAppContext } from "@/app/context/AppContext";
+import { paintPixel } from "@/app/canvas/canva-pixel/canva-pixel";
 
 export function ColorPanel() {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
-  const { selectedColor, setSelectedColor, setShouldZoom } = useAppContext();
+  const {
+    selectedColor,
+    setSelectedColor,
+    setShouldZoom,
+    targetPixel,
+    addPixel,
+  } = useAppContext();
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const [colors, setColors] = useState<string | null>(selectedColor ?? null);
+
+  useEffect(() => {
+    const canvas = document.querySelector("canvas");
+    if (canvas instanceof HTMLCanvasElement) {
+      canvasRef.current = canvas;
+    }
+  }, []);
 
   useEffect(() => {
     if (isPanelOpen) {
@@ -74,8 +89,14 @@ export function ColorPanel() {
             />
             <CircleCheck
               onClick={() => {
-                if (colors) {
+                if (colors && targetPixel) {
                   setSelectedColor(colors);
+                  paintPixel(canvasRef, targetPixel.x, targetPixel.y, colors);
+                  addPixel({
+                    x: targetPixel.x,
+                    y: targetPixel.y,
+                    color: colors,
+                  });
                 }
                 setIsPanelOpen(false);
               }}
