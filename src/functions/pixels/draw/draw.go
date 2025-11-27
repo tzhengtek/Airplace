@@ -51,6 +51,7 @@ var (
 	chunkSizeEnv      string
 	topicID           string
 	addUserTopicID    string
+	triggerResetName  string
 )
 
 func init() {
@@ -59,6 +60,7 @@ func init() {
 	chunkSizeEnv = os.Getenv("CHUNK_SIZE")
 	topicID = os.Getenv("PIXEL_UPDATE_TOPIC")
 	addUserTopicID = os.Getenv("ADD_USER_TOPIC")
+	triggerResetName = os.Getenv("TRIGGER_RESET_NAME")
 
 	functions.HTTP("drawPixel", drawPixel)
 }
@@ -197,7 +199,7 @@ func savePixelToFirestore(pixelInfo []PixelInfo, projectId string, firestoreData
 		}
 	}
 
-	triggerRef := client.Collection("trigger-reset").Doc("trigger-reset")
+	triggerRef := client.Collection(triggerResetName).Doc(triggerResetName)
 	if _, err := batch.Set(triggerRef, map[string]any{
 		"lastTriggered": firestore.ServerTimestamp,
 	}); err != nil {

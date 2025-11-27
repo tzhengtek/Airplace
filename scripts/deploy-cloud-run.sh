@@ -329,6 +329,9 @@ deploy_service() {
                 echo "  --set-env-vars $ENV_VARS \\"
             fi
         fi
+        if [ -n "$REMOVE_ENV_VARS" ]; then
+            echo "  --remove-env-vars $REMOVE_ENV_VARS \\"
+        fi
         if [ -n "$SECRET_NAME" ] && [ -n "$SECRET_ENV_KEY" ]; then
             if [ "$is_update" = true ]; then
                 echo "  --update-secrets ${SECRET_ENV_KEY}=${SECRET_NAME}:latest \\"
@@ -378,6 +381,11 @@ deploy_service() {
         fi
     fi
     
+    # Remove environment variables if specified
+    if [ -n "$REMOVE_ENV_VARS" ]; then
+        deploy_cmd="$deploy_cmd --remove-env-vars \"$REMOVE_ENV_VARS\""
+    fi
+    
     # Add secret environment variable if specified
     if [ -n "$SECRET_NAME" ] && [ -n "$SECRET_ENV_KEY" ]; then
         if [ "$is_update" = true ]; then
@@ -412,6 +420,9 @@ deploy_service() {
         else
             echo "  --set-env-vars \"$ENV_VARS\""
         fi
+    fi
+    if [ -n "$REMOVE_ENV_VARS" ]; then
+        echo "  --remove-env-vars \"$REMOVE_ENV_VARS\""
     fi
     if [ -n "$SECRET_NAME" ] && [ -n "$SECRET_ENV_KEY" ]; then
         if [ "$is_update" = true ]; then
@@ -764,6 +775,46 @@ done
 if [ -n "$ENV_VARS" ]; then
     echo ""
     print_success "Environment variables configured: $ENV_VARS"
+fi
+
+# Remove environment variables (only for update mode)
+REMOVE_ENV_VARS=""
+if [ "$DEPLOYMENT_MODE" = "update" ]; then
+    echo ""
+    if ask_yes_no "Do you want to remove any environment variables?" "n"; then
+        print_info "Enter environment variable keys to remove. Leave empty to finish."
+        REMOVE_ENV_COUNT=0
+        
+        while true; do
+            REMOVE_ENV_COUNT=$((REMOVE_ENV_COUNT + 1))
+            echo ""
+            REMOVE_ENV_KEY=$(get_input "Enter environment variable KEY to remove (or leave empty to finish)" "")
+            
+            # If KEY is empty, stop collecting
+            if [ -z "$REMOVE_ENV_KEY" ]; then
+                if [ $REMOVE_ENV_COUNT -eq 1 ]; then
+                    print_info "No environment variables to remove"
+                else
+                    print_success "Finished configuring environment variables to remove"
+                fi
+                break
+            fi
+            
+            # Add to REMOVE_ENV_VARS string in format KEY1,KEY2,KEY3
+            if [ -z "$REMOVE_ENV_VARS" ]; then
+                REMOVE_ENV_VARS="$REMOVE_ENV_KEY"
+            else
+                REMOVE_ENV_VARS="${REMOVE_ENV_VARS},${REMOVE_ENV_KEY}"
+            fi
+            
+            print_success "Added to removal list: $REMOVE_ENV_KEY"
+        done
+        
+        if [ -n "$REMOVE_ENV_VARS" ]; then
+            echo ""
+            print_success "Environment variables to remove: $REMOVE_ENV_VARS"
+        fi
+    fi
 fi
 
 # Service account configuration (only for new deployments)

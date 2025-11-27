@@ -1,4 +1,4 @@
-package main
+package proxy
 
 import (
 	"encoding/json"
@@ -11,24 +11,8 @@ import (
 
 	"cloud.google.com/go/firestore"
 	"cloud.google.com/go/pubsub/v2"
+	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 )
-
-func main() {
-	log.Printf("Starting Proxy server...")
-	http.HandleFunc("POST /pixel-draw", publishDraw)
-	http.HandleFunc("POST /pixel-update", publishUpdate)
-
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8081"
-		log.Printf("defaulting to port %s", port)
-	}
-
-	log.Printf("listening on port %s", port)
-	if err := http.ListenAndServe(":"+port, nil); err != nil {
-		log.Fatal(err)
-	}
-}
 
 type PubSubMessage struct {
 	Message struct {
@@ -47,10 +31,41 @@ type PixelInfo struct {
 	Timestamp string `json:"timestamp"`
 }
 
-func publishUpdate(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Publish Update function...")
+var (
+	projectId         string
+	firestoreDatabase string
+	userCollection    string
+	rateLimit         string
+	rateLimitDuration time.Duration
+	drawPixelTopicID  string
+)
+
+func init() {
+	projectId = os.Getenv("PROJECT_ID")
+	firestoreDatabase = os.Getenv("FIRESTORE_DATABASE")
+	userCollection = os.Getenv("USER_COLLECTION")
+	rateLimit = os.Getenv("RATE_LIMIT")
+	drawPixelTopicID = os.Getenv("DRAW_PIXEL_TOPIC")
+
+	functions.HTTP("proxyInterface", publishDraw)
+}
+
+func publishDraw(w http.ResponseWriter, r *http.Request) {
+	if projectId == "" || firestoreDatabase == "" || userCollection == "" || rateLimit == "" {
+		http.Error(w, "Environment variables are not set", http.StatusInternalServerError)
+		return
+	}
+
+	var err error
+	rateLimitDuration, err = time.ParseDuration(rateLimit)
+	if err != nil {
+		log.Printf("Error parsing rate limit: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("Publish Draw function...")
 	ctx := r.Context()
-	projectId := "serveless-epitech-dev"
 	c, err := pubsub.NewClient(ctx, projectId)
 	if err != nil {
 		log.Printf("Error while retrieving Gcloud Profile: %v", err)
@@ -80,7 +95,7 @@ func publishUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	firestoreClient, err := firestore.NewClientWithDatabase(ctx, projectId, "serverless-epitech-firestore")
+	firestoreClient, err := firestore.NewClientWithDatabase(ctx, projectId, firestoreDatabase)
 	if err != nil {
 		log.Printf("Error creating Firestore client: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -88,9 +103,8 @@ func publishUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	defer firestoreClient.Close()
 
-	userDoc, err := firestoreClient.Collection("users").Doc(pixelInfo.User).Get(ctx)
+	userDoc, err := firestoreClient.Collection(userCollection).Doc(pixelInfo.User).Get(ctx)
 	if err != nil {
-		log.Printf("Error retrieving user document: %v", err)
 		log.Printf("User document not found, allowing request")
 	} else {
 		lastUpdated, ok := userDoc.Data()["lastUpdated"]
@@ -108,7 +122,7 @@ func publishUpdate(w http.ResponseWriter, r *http.Request) {
 			}
 			if !lastUpdatedTime.IsZero() {
 				timeDiff := time.Since(lastUpdatedTime)
-				if timeDiff < 300*time.Second {
+				if timeDiff < rateLimitDuration*time.Second {
 					log.Printf("Rate limit exceeded: last update was %v ago (limit: 300s)", timeDiff)
 					http.Error(w, "Not allowed: rate limit exceeded", http.StatusForbidden)
 					return
@@ -117,16 +131,13 @@ func publishUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	topic := c.Publisher("pixel.draw")
+	topic := c.Publisher(drawPixelTopicID)
 	topic.PublishSettings = pubsub.PublishSettings{
 		CountThreshold: 10,
 		DelayThreshold: 100 * time.Millisecond,
 		ByteThreshold:  1e6,
 	}
 	defer topic.Stop()
-
-	// Publish raw JSON bytes - Pub/Sub will base64 encode when pushing to HTTP endpoint
-	log.Printf("Publishing raw JSON: %s", string(body))
 
 	msgId, err := topic.Publish(ctx, &pubsub.Message{
 		Data: body,
@@ -140,8 +151,4 @@ func publishUpdate(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Message published successfully with ID: %s", msgId)
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "Message published: %s", msgId)
-}
-
-func publishDraw(w http.ResponseWriter, r *http.Request) {
-	log.Printf("Publish Draw function...")
 }
