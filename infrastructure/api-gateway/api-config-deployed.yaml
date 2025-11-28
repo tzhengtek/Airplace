@@ -18,7 +18,7 @@ paths:
       summary: CORS preflight
       operationId: proxyOptions
       x-google-backend:
-        address: https://proxy-interface-hn2wtuxuha-ew.a.run.app
+        address: https://proxy-interface-nphddnxiva-ew.a.run.app
         path_translation: APPEND_PATH_TO_ADDRESS
       responses:
         "204":
@@ -49,7 +49,7 @@ paths:
             $ref: "#/definitions/Pixel"
 
       x-google-backend:
-        address: https://proxy-interface-hn2wtuxuha-ew.a.run.app
+        address: https://proxy-interface-nphddnxiva-ew.a.run.app
         path_translation: APPEND_PATH_TO_ADDRESS
 
       responses:
@@ -90,7 +90,7 @@ paths:
           schema:
             $ref: "#/definitions/DiscordInteraction"
       x-google-backend:
-        address: https://discord-interactions-hn2wtuxuha-ew.a.run.app
+        address: https://discord-interactions-nphddnxiva-ew.a.run.app
         path_translation: APPEND_PATH_TO_ADDRESS
       responses:
         "200":

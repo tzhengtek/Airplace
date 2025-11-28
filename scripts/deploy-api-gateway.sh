@@ -260,7 +260,7 @@ if [ "$DEPLOYMENT_FAILED" = false ]; then
     echo -e "${GREEN}gcloud api-gateway api-configs create \"$CONFIG_ID\" \\${NC}"
     echo -e "${GREEN}    --api=\"$API_ID\" \\${NC}"
     echo -e "${GREEN}    --openapi-spec=api-config-deployed.yaml \\${NC}"
-    echo -e "${GREEN}    --backend-auth-service-account=api-gateway-invoker@serveless-epitech-dev.iam.gserviceaccount.com \\${NC}"
+    echo -e "${GREEN}    --backend-auth-service-account=api-gateway-invoker@serverless-epitech-prd.iam.gserviceaccount.com \\${NC}"
     echo -e "${GREEN}    --project=\"$PROJECT_ID\"${NC}"
     echo ""
     
@@ -269,7 +269,7 @@ if [ "$DEPLOYMENT_FAILED" = false ]; then
         gcloud api-gateway api-configs create "$CONFIG_ID" \
             --api="$API_ID" \
             --openapi-spec=api-config-deployed.yaml \
-            --backend-auth-service-account=api-gateway-invoker@serveless-epitech-dev.iam.gserviceaccount.com \
+            --backend-auth-service-account=api-gateway-invoker@serverless-epitech-prd.iam.gserviceaccount.com \
             --project="$PROJECT_ID"
         
         if [ $? -eq 0 ]; then

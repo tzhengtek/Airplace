@@ -535,7 +535,7 @@ echo ""
 
 # Ask if this is a push subscription
 PUSH_ENDPOINT=""
-PUSH_AUTH_SA="cloud-run-pubsub-invoker@serveless-epitech-dev.iam.gserviceaccount.com"
+PUSH_AUTH_SA="cloud-run-pubsub-invoker@serverless-epitech-prd.iam.gserviceaccount.com"
 
 if ask_yes_no "Is this a push subscription (messages pushed to Cloud Run)?" "y"; then
     echo ""
