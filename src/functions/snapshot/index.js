@@ -19,7 +19,17 @@ functions.http('snapshot-make', async (req, res) => {
     }
     console.log('[snapshot-make] start fetching pixel');
     const rawPixels = await fetchAllPixels();
+    try {
+      console.info('[snapshot-make] rawPixels count:', rawPixels);
+    } catch (err) {
+      console.warn('[snapshot-make] Failed to log rawPixels', err);
+    }
     const pixels = normalizePixels(rawPixels, 100);
+    try {
+      console.info('[snapshot-make] normalized pixels count:', pixels);
+    } catch (err) {
+      console.warn('[snapshot-make] Failed to log normalized pixels', err);
+    }
     const buffer = drawSnapshot(pixels, { width: 100, height: 100, tileSize: 1, background: '#FFFFFF' });
     console.log('[snapshot-make] start writing in bucket');
     const bucketRef = storage.bucket(bucket);
