@@ -37,13 +37,18 @@ export function addPixelToState(state: CanvasState, pixel: PixelData): CanvasSta
     (p) => p.x === pixel.x && p.y === pixel.y
   );
 
+  let newPixels: PixelData[];
   if (existingIndex >= 0) {
-    state.pixels[existingIndex] = pixel;
+    newPixels = state.pixels.map((p, idx) =>
+      idx === existingIndex ? pixel : p
+    );
   } else {
-    state.pixels.push(pixel);
+    newPixels = [...state.pixels, pixel];
   }
-
-  return state;
+  return {
+    ...state,
+    pixels: newPixels,
+  };
 }
 
 export function clearCanvasState(): void {

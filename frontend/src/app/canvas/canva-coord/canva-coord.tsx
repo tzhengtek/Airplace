@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CircleCheck, CircleX } from "lucide-react";
-import { COLORS_PANEL } from "@/constants/constants";
+import { CircleX } from "lucide-react";
 import { useAppContext } from "@/app/context/AppContext";
 
 export function ColorCoord() {
-  const { targetPixel, setTargetPixel } = useAppContext();
+  const { targetPixel } = useAppContext();
 
   return (
     <div className="flex fixed justify-center top-4 left-0 right-0">

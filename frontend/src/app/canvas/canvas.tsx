@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, MouseEvent } from "react";
+import { useEffect, useRef, MouseEvent } from "react";
 import { CanvaPixel, coordsToId } from "./canva-pixel/canva-pixel";
 import { useAppContext } from "../context/AppContext";
 import { GRID_SIZE, PIXEL_SIZE } from "@/constants/constants";
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 50;
-const ZOOM_SPEED = 0.005;
 const CLICK_DISTANCE_THRESHOLD = 5;
 const ZOOM_FACTOR = 0.05;
 
@@ -203,12 +202,6 @@ export function Canvas() {
     };
 
     animationRef.current = requestAnimationFrame(step);
-  };
-
-  const triggerZoomToTargetPixel = () => {
-    if (targetPixel) {
-      setShouldZoom(true);
-    }
   };
 
   useEffect(() => {

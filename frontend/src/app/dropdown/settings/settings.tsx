@@ -6,7 +6,7 @@ import {
   DialogPanel,
   DialogTitle,
 } from "@headlessui/react";
-import React, { useState } from "react";
+import { useState } from "react";
 import { X, RotateCcw } from "lucide-react";
 import { useAppContext } from "@/app/context/AppContext";
 
@@ -83,7 +83,7 @@ export function Settings() {
         <div className="fixed inset-0 flex w-screen items-center justify-center p-4">
           <DialogPanel className="w-full max-w-sm rounded-md bg-white p-6 text-black shadow-xl animate-pop-in">
             <DialogTitle className="font-bold text-lg mb-4">
-              Confirmer la suppression
+              Confirm Clear Local Storage
             </DialogTitle>
             <p className="text-gray-600 mb-6">
               Do you really want to clear local storage? This action cannot be
