@@ -265,8 +265,13 @@ export async function generateView(payload) {
 functions.http('view-make', async (req, res) => {
   try {
     const bucketView = 'serverless-epitech-view';
+    try {
     const payload = JSON.parse(Buffer.from(req.body.message.data, 'base64').toString('utf-8'));
     console.log("[view-make] Payload reçu :", payload);
+    }  catch (err) {
+      console.error("[view-make] Failed to parse payload:", err);
+      return res.status(400).send('invalid payload');
+    }
     const buffer = await generateView(payload);
     console.log("[view-make] Image générée");
     const bucketViewRef = storage.bucket(bucketView);
