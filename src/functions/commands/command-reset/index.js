@@ -89,6 +89,7 @@ async function processCommand(data) {
     try {
         await deleteCollection(db, "canvas_chunks", 100);
         await deleteCollection(db, "trigger_reset", 100);
+        await deleteCollection(db, "users", 100);
         await editOriginalMessage(cachedAppId, data.interactionToken, {
             content: `🔄✅ Airplace session reset.`
         });
