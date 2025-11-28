@@ -3,7 +3,6 @@ package reset
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	pubsubadmin "cloud.google.com/go/pubsub/v2/apiv1"
 	adminpb "cloud.google.com/go/pubsub/v2/apiv1/pubsubpb"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
+	"github.com/airplace/common/logging"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"google.golang.org/api/iterator"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -36,7 +36,7 @@ func resetPixel(ctx context.Context, e event.Event) error {
 		return fmt.Errorf("failed to seek subscriptions: %v", err)
 	}
 
-	log.Printf("Successfully cleared messages from topic: %s", topicName)
+	logging.InfoF("reset", "Successfully cleared messages from topic: %s", topicName)
 	return nil
 }
 
@@ -69,7 +69,7 @@ func seekAllSubscriptionsToNow(ctx context.Context, topicName string) error {
 			return fmt.Errorf("error listing topic subscriptions: %w", err)
 		}
 
-		log.Printf("Seeking subscription %s to %v", subName, now.AsTime())
+		logging.InfoF("reset", "Seeking subscription %s to %v", subName, now.AsTime())
 
 		_, err = subAdmin.Seek(ctx, &adminpb.SeekRequest{
 			Subscription: subName,

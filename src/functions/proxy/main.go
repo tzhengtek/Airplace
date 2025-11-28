@@ -12,6 +12,7 @@ import (
 	"cloud.google.com/go/firestore"
 	"cloud.google.com/go/pubsub/v2"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
+	"github.com/airplace/common/logging"
 )
 
 type PubSubMessage struct {
@@ -47,6 +48,7 @@ func init() {
 	rateLimit = os.Getenv("RATE_LIMIT")
 	drawPixelTopicID = os.Getenv("DRAW_PIXEL_TOPIC")
 
+	log.SetFlags(0)
 	functions.HTTP("proxyInterface", publishDraw)
 }
 
@@ -59,16 +61,16 @@ func publishDraw(w http.ResponseWriter, r *http.Request) {
 	var err error
 	rateLimitDuration, err = time.ParseDuration(rateLimit)
 	if err != nil {
-		log.Printf("Error parsing rate limit: %v", err)
+		logging.Error("proxy", "Error parsing rate limit", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("Publish Draw function...")
+	logging.Info("proxy", "Publish Draw function started")
 	ctx := r.Context()
 	c, err := pubsub.NewClient(ctx, projectId)
 	if err != nil {
-		log.Printf("Error while retrieving Gcloud Profile: %v", err)
+		logging.Error("proxy", "Error while retrieving Gcloud Profile", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -76,28 +78,28 @@ func publishDraw(w http.ResponseWriter, r *http.Request) {
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		log.Printf("Error while reading the request body: %v", err)
+		logging.Error("proxy", "Error while reading the request body", err)
 		http.Error(w, "Failed to read request body", http.StatusBadRequest)
 		return
 	}
 	defer r.Body.Close()
 
 	if !json.Valid(body) {
-		log.Printf("Error: messageData is not valid JSON: %s", string(body))
+		logging.ErrorF("proxy", "Error: messageData is not valid JSON: %s", string(body))
 		http.Error(w, "Invalid JSON data", http.StatusBadRequest)
 		return
 	}
 
 	var pixelInfo PixelInfo
 	if err := json.Unmarshal(body, &pixelInfo); err != nil {
-		log.Printf("Error while deserialize pixel info from body: %v", err)
+		logging.Error("proxy", "Error while deserialize pixel info from body", err)
 		http.Error(w, "Bad Request: invalid body", http.StatusBadRequest)
 		return
 	}
 
 	firestoreClient, err := firestore.NewClientWithDatabase(ctx, projectId, firestoreDatabase)
 	if err != nil {
-		log.Printf("Error creating Firestore client: %v", err)
+		logging.Error("proxy", "Error creating Firestore client", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
@@ -105,7 +107,7 @@ func publishDraw(w http.ResponseWriter, r *http.Request) {
 
 	userDoc, err := firestoreClient.Collection(userCollection).Doc(pixelInfo.User).Get(ctx)
 	if err != nil {
-		log.Printf("User document not found, allowing request")
+		logging.InfoF("proxy", "User document not found for user %s, allowing request", pixelInfo.User)
 	} else {
 		lastUpdated, ok := userDoc.Data()["lastUpdated"]
 		if ok {
@@ -118,12 +120,12 @@ func publishDraw(w http.ResponseWriter, r *http.Request) {
 					lastUpdatedTime = *v
 				}
 			default:
-				log.Printf("Unexpected type for lastupdated: %T, value: %v", v, v)
+				logging.WarningF("proxy", "Unexpected type for lastupdated: %T, value: %v", v, v)
 			}
 			if !lastUpdatedTime.IsZero() {
 				timeDiff := time.Since(lastUpdatedTime)
-				if timeDiff < rateLimitDuration*time.Second {
-					log.Printf("Rate limit exceeded: last update was %v ago (limit: 300s)", timeDiff)
+				if timeDiff < rateLimitDuration {
+					logging.WarningF("proxy", "Rate limit exceeded: last update was %v ago (limit: %v)", timeDiff, rateLimitDuration)
 					http.Error(w, "Not allowed: rate limit exceeded", http.StatusForbidden)
 					return
 				}
@@ -143,12 +145,12 @@ func publishDraw(w http.ResponseWriter, r *http.Request) {
 		Data: body,
 	}).Get(ctx)
 	if err != nil {
-		log.Printf("Error publishing message: %v", err)
+		logging.Error("proxy", "Error publishing message", err)
 		http.Error(w, "Failed to publish message", http.StatusInternalServerError)
 		return
 	}
 
-	log.Printf("Message published successfully with ID: %s", msgId)
+	logging.InfoF("proxy", "Message published successfully with ID: %s", msgId)
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, "Message published: %s", msgId)
 }

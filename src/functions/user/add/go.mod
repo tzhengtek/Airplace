@@ -2,9 +2,12 @@ module example.com/add_user
 
 go 1.25.4
 
+replace github.com/airplace/common/logging => ../../common/logging
+
 require (
 	cloud.google.com/go/firestore v1.18.0
 	github.com/GoogleCloudPlatform/functions-framework-go v1.9.2
+	github.com/airplace/common/logging v0.0.0
 )
 
 require (
