@@ -198,8 +198,6 @@ export function handleAdminSnapshotCommand(pubSubClient, appId, interactionToken
     }
 }
 
-const CHUNK_SIZE = parseInt(process.env.CHUNK_SIZE, 10);
-
 const AIRPLACE_COMMAND = {
     name: 'airplace',
     description: 'Airplace game commands',
