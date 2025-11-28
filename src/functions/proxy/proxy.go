@@ -54,6 +54,17 @@ func init() {
 }
 
 func publishDraw(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "POST")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("Access-Control-Max-Age", "3600")
+
+	// Handle preflight
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent) // 204
+		return
+	}
+
 	if projectId == "" || firestoreDatabase == "" || userCollection == "" || rateLimit == "" {
 		http.Error(w, "Environment variables are not set", http.StatusInternalServerError)
 		return
@@ -129,7 +140,16 @@ func publishDraw(w http.ResponseWriter, r *http.Request) {
 				timeDiff := time.Since(lastUpdatedTime)
 				if timeDiff < rateLimitDuration {
 					logging.WarningF("proxy", "Rate limit exceeded: last update was %v ago (limit: %v)", timeDiff, rateLimitDuration)
-					http.Error(w, "Not allowed: rate limit exceeded", http.StatusForbidden)
+					data := map[string]any{
+						"lastUpdated": lastUpdatedTime.Format(time.RFC3339),
+					}
+					jsonData, err := json.Marshal(data)
+					if err != nil {
+						logging.Error("proxy", "Error marshalling data", err)
+						http.Error(w, "Internal server error", http.StatusInternalServerError)
+						return
+					}
+					http.Error(w, string(jsonData), http.StatusForbidden)
 					return
 				}
 			}

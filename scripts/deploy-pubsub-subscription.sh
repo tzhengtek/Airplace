@@ -209,14 +209,14 @@ deploy_subscription() {
         echo "gcloud pubsub subscriptions create $SUBSCRIPTION_NAME \\"
         echo "  --topic=$TOPIC_NAME \\"
         if [ -n "$PUSH_ENDPOINT" ] || [ -n "$DEAD_LETTER_TOPIC" ] || [ -n "$FILTER_STRING" ]; then
-            echo "  --ack-deadline=$ACK_DEADLINE \\"
+        echo "  --ack-deadline=$ACK_DEADLINE \\"
         else
             echo "  --ack-deadline=$ACK_DEADLINE"
         fi
         if [ -n "$PUSH_ENDPOINT" ]; then
             if [ -n "$DEAD_LETTER_TOPIC" ] || [ -n "$FILTER_STRING" ]; then
-                echo "  --push-endpoint=$PUSH_ENDPOINT \\"
-                echo "  --push-auth-service-account=$PUSH_AUTH_SA \\"
+            echo "  --push-endpoint=$PUSH_ENDPOINT \\"
+            echo "  --push-auth-service-account=$PUSH_AUTH_SA \\"
             else
                 echo "  --push-endpoint=$PUSH_ENDPOINT \\"
                 echo "  --push-auth-service-account=$PUSH_AUTH_SA"
@@ -224,8 +224,8 @@ deploy_subscription() {
         fi
         if [ -n "$DEAD_LETTER_TOPIC" ]; then
             if [ -n "$FILTER_STRING" ]; then
-                echo "  --dead-letter-topic=$DEAD_LETTER_TOPIC \\"
-                echo "  --max-delivery-attempts=$MAX_DELIVERY_ATTEMPTS \\"
+            echo "  --dead-letter-topic=$DEAD_LETTER_TOPIC \\"
+            echo "  --max-delivery-attempts=$MAX_DELIVERY_ATTEMPTS \\"
             else
                 echo "  --dead-letter-topic=$DEAD_LETTER_TOPIC \\"
                 echo "  --max-delivery-attempts=$MAX_DELIVERY_ATTEMPTS"
@@ -617,14 +617,14 @@ if ask_yes_no "Do you want to configure a dead letter topic?" "y"; then
                         break
                     else
                         print_error "Failed to create dead letter topic '$DEAD_LETTER_TOPIC'"
-                        if ! ask_yes_no "Do you want to try another topic name?" "y"; then
-                            print_info "Dead letter topic configuration cancelled"
-                            DEAD_LETTER_TOPIC=""
-                            break
-                        fi
-                        echo ""
-                    fi
-                else
+                if ! ask_yes_no "Do you want to try another topic name?" "y"; then
+                    print_info "Dead letter topic configuration cancelled"
+                    DEAD_LETTER_TOPIC=""
+                    break
+                fi
+                echo ""
+            fi
+        else
                     if ! ask_yes_no "Do you want to try another topic name?" "y"; then
                         print_info "Dead letter topic configuration cancelled"
                         DEAD_LETTER_TOPIC=""

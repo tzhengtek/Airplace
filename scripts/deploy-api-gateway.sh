@@ -181,7 +181,7 @@ else
     CONFIG_ID="config-1"
 fi
 
-echo "" 
+echo ""
 
 # Ask for Gateway ID
 read -p "Enter Gateway ID (name of your API Gateway): " GATEWAY_ID

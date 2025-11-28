@@ -40,6 +40,7 @@ export default function DiscordCallbackPage() {
         }
         if (result.user) {
           localStorage.setItem("discord_user", JSON.stringify(result.user));
+          localStorage.setItem("discord_user_id", result.user.id);
           // Trigger storage event for ProfileAvatar component
           window.dispatchEvent(new Event("storage"));
         }

@@ -5,6 +5,7 @@ import { CircleCheck, CircleX } from "lucide-react";
 import { COLORS_PANEL } from "@/constants/constants";
 import { useAppContext } from "@/app/context/AppContext";
 import { paintPixel } from "@/app/canvas/canva-pixel/canva-pixel";
+import apiClient from "@/api";
 
 export function ColorPanel() {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
@@ -18,6 +19,9 @@ export function ColorPanel() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const [colors, setColors] = useState<string | null>(selectedColor ?? null);
+  const [canDraw, setCanDraw] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
 
   useEffect(() => {
     const canvas = document.querySelector("canvas");
@@ -30,19 +34,71 @@ export function ColorPanel() {
     if (isPanelOpen) {
       setColors(selectedColor ?? null);
     }
-  }, [isPanelOpen, selectedColor]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPanelOpen]);
+
+  useEffect(() => {
+    if (!lastUpdated) {
+      setTimeLeft(null);
+      setCanDraw(true);
+      return;
+    }
+  
+    const COOLDOWN_DURATION = Number(process.env.NEXT_PUBLIC_COOLDOWN_DURATION) * 1000;
+  
+    const updateTimeLeft = () => {
+      const lastUpdatedTime = new Date(lastUpdated).getTime();
+      const now = Date.now();
+      const elapsedTime = now - lastUpdatedTime;
+      const remainingTime = COOLDOWN_DURATION - elapsedTime;
+  
+
+      if (remainingTime <= 0) {
+        // Cooldown is over
+        setTimeLeft(0);
+        setCanDraw(true);
+        setLastUpdated(null);
+        return;
+      }
+  
+      const remainingSeconds = Math.ceil(remainingTime / 1000);
+      setTimeLeft(remainingSeconds);
+      setCanDraw(false);
+    };
+  
+    updateTimeLeft();
+    const interval = setInterval(updateTimeLeft, 1000);
+    return () => clearInterval(interval);
+  }, [lastUpdated]);
 
   return (
     <div className="fixed bottom-4 left-0 right-0 flex justify-center transition-transform hover:scale-110 duration-200">
-      <button
-        onClick={() => {
-          setIsPanelOpen(true);
-          setShouldZoom(true);
-        }}
-        className="bg-white px-8 py-3 text-xl text-black rounded-full shadow-xl/50 hover:shadow-xl/100 transition-shadow duration-300 "
-      >
-        Place a pixel
-      </button>
+      {canDraw ? (
+        <button
+          onClick={() => (setIsPanelOpen(true), setShouldZoom(true))}
+          className="bg-white px-8 py-3 text-xl text-black rounded-full shadow-xl/50 hover:shadow-xl/100 transition-shadow duration-300 "
+        >
+          Place a pixel
+        </button>
+      ) : (
+        <button
+          disabled
+          className="bg-gray-300 px-8 py-3 text-xl text-black rounded-full shadow-inner cursor-not-allowed transition-shadow duration-300"
+        >
+          You can place a pixel in&nbsp;
+          <span>
+  {timeLeft !== null
+    ? (() => {
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        return `${minutes.toString().padStart(2, "0")}:${seconds
+          .toString()
+          .padStart(2, "0")}`;
+      })()
+    : "a few moments"}
+</span>
+        </button>
+      )}
 
       <div
         className={`fixed inset-0 z-10 transition-opacity duration-300 ${
@@ -94,12 +150,27 @@ export function ColorPanel() {
               onClick={() => {
                 if (colors && targetPixel) {
                   setSelectedColor(colors);
-                  paintPixel(canvasRef, targetPixel.x, targetPixel.y, colors);
-                  addPixel({
-                    x: targetPixel.x,
-                    y: targetPixel.y,
-                    color: colors,
+                  apiClient.drawPixel(
+                    targetPixel.x,
+                    targetPixel.y,
+                    COLORS_PANEL.indexOf(colors),
+                  )
+                  .then(() => {
+                    setCanDraw(true);
+                    paintPixel(canvasRef, targetPixel.x, targetPixel.y, colors);
+                    addPixel({
+                      x: targetPixel.x,
+                      y: targetPixel.y,
+                      color: colors,
+                    });
+                  })
+                  .catch((err) => {
+                    if (err.status === 403) {
+                      setLastUpdated(err.data.lastUpdated);
+                      setCanDraw(false);
+                    }
                   });
+
                 }
                 setIsPanelOpen(false);
               }}

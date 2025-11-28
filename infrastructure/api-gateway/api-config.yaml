@@ -1,137 +1,174 @@
-openapi: 3.0.4
+swagger: "2.0"
 info:
   title: AirPlace - API Gateway
   description: AirPlace Gateway configuration
-  version: 1.0.0
-servers:
-  - url: https://
-    description: API Gateway server
+  version: "1.0.0"
 
-x-google-api-management:
-  backends:
-    proxy-interface-backend:
-      address: ${PROXY_INTERFACE_URL}
-      pathTranslation: APPEND_PATH_TO_ADDRESS
-      protocol: "http/1.1"
-    discord-interactions-backend:
-      address: ${DISCORD_INTERACTIONS_URL}
-      pathTranslation: APPEND_PATH_TO_ADDRESS
-      protocol: "http/1.1"
+host: airplace-gateway-4zbbjsv3.ew.gateway.dev
+basePath: "/"
+schemes:
+  - https
 
+x-google-endpoints:
+  - name: "airplace-gateway-4zbbjsv3.ew.gateway.dev"
+    allowCors: true
 paths:
   /v1/proxy-interface:
+    options:
+      summary: CORS preflight
+      operationId: proxyOptions
+      x-google-backend:
+        address: ${PROXY_INTERFACE_URL}
+        path_translation: APPEND_PATH_TO_ADDRESS
+      responses:
+        "204":
+          description: Preflight OK
+          headers:
+            Access-Control-Allow-Origin:
+              type: string
+              default: "*"
+            Access-Control-Allow-Methods:
+              type: string
+              default: "POST, OPTIONS"
+            Access-Control-Allow-Headers:
+              type: string
+              default: "Content-Type, Authorization"
+
     post:
       summary: API proxy
       operationId: proxy
-      requestBody:
-        required: true
-        description: Api Gateway endpoint to proxy the request to the appropriate service.
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/Pixel"
-      x-google-backend: proxy-interface-backend
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/Pixel"
+
+      x-google-backend:
+        address: ${PROXY_INTERFACE_URL}
+        path_translation: APPEND_PATH_TO_ADDRESS
+
       responses:
         "200":
           description: A successful response
-          content:
-            application/json:
-              schema:
-                type: string
+          schema:
+            type: string
+          headers:
+            Access-Control-Allow-Origin:
+              type: string
+              default: "*"
+            Access-Control-Allow-Methods:
+              type: string
+              default: "POST, OPTIONS"
+            Access-Control-Allow-Headers:
+              type: string
+              default: "Content-Type, Authorization"
         "400":
-          $ref: "#/components/responses/BadRequestError"
+          $ref: "#/responses/BadRequestError"
         "500":
-          $ref: "#/components/responses/InternalServerError"
+          $ref: "#/responses/InternalServerError"
 
+  ###############################################################
+  # NO CORS HERE (Discord does not require it)
+  ###############################################################
   /v1/discord/interactions:
     post:
       summary: Discord Implementation
       operationId: discord
-      requestBody:
-        required: true
-        description: Discord interaction request body with type enum
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/DiscordInteraction"
-      x-google-backend: discord-interactions-backend
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: body
+          name: body
+          required: true
+          schema:
+            $ref: "#/definitions/DiscordInteraction"
+      x-google-backend:
+        address: ${DISCORD_INTERACTIONS_URL}
+        path_translation: APPEND_PATH_TO_ADDRESS
       responses:
         "200":
-          description: Succesful Response from discord
-          content:
-            application/json:
-              schema:
-                type: string
+          description: Successful Response from discord
+          schema:
+            type: string
 
-components:
-  responses:
-    BadRequestError:
-      description: Invalid input provided
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/ErrorResponse"
-    InternalServerError:
-      description: Unexpected server error
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/ErrorResponse"
-  schemas:
-    ErrorResponse:
-      type: object
-      properties:
-        error:
-          type: string
-          description: Machine-readable error code
-        message:
-          type: string
-          description: Human-readable error message
-        details:
-          type: object
-          additionalProperties: true
-          description: Additional error context
-        timestamp:
-          type: string
-          format: date-time
-        traceId:
-          type: string
-          description: Unique identifier for error tracing
-    Pixel:
-      type: object
-      properties:
-        x:
-          type: integer
-          format: int32
-        y:
-          type: integer
-          format: int32
-        color:
-          type: integer
-          format: int32
-        user:
-          type: string
-          pattern: "^[0-9]{17,18}$"
-        timestamp:
-          type: string
-          format: date-time
-    DiscordInteraction:
-      type: object
-      required:
-        - type
-      properties:
-        type:
-          type: integer
-          enum:
-            - 1
-            - 2
-            - 3
-            - 4
-            - 5
-          description: |
-            Discord interaction type:
-            - 1: Ping
-            - 2: ApplicationCommand
-            - 3: MessageComponent
-            - 4: ApplicationCommandAutocomplete
-            - 5: ModalSubmit
+
+###############################################################
+# Shared responses
+###############################################################
+responses:
+  BadRequestError:
+    description: Invalid input provided
+    schema:
+      $ref: "#/definitions/ErrorResponse"
+    headers:
+      Access-Control-Allow-Origin:
+        type: string
+        default: "*"
+  InternalServerError:
+    description: Unexpected server error
+    schema:
+      $ref: "#/definitions/ErrorResponse"
+    headers:
+      Access-Control-Allow-Origin:
+        type: string
+        default: "*"
+
+
+###############################################################
+# Shared Definitions
+###############################################################
+definitions:
+
+  ErrorResponse:
+    type: object
+    properties:
+      error:
+        type: string
+      message:
+        type: string
+      details:
+        type: object
+        additionalProperties: true
+      timestamp:
+        type: string
+        format: date-time
+      traceId:
+        type: string
+
+  Pixel:
+    type: object
+    required:
+      - x
+      - y
+      - color
+      - user
+      - timestamp
+    properties:
+      x:
+        type: integer
+      y:
+        type: integer
+      color:
+        type: integer
+      user:
+        type: string
+        pattern: "^[0-9]{17,18}$"
+      timestamp:
+        type: string
+        format: date-time
+
+  DiscordInteraction:
+    type: object
+    required:
+      - type
+    properties:
+      type:
+        type: integer
+        enum: [1, 2, 3, 4, 5]

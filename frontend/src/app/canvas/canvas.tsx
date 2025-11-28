@@ -300,7 +300,7 @@ export function Canvas() {
 
     const id = coordsToId(cellX, cellY);
     setTargetPixel({ x: cellX, y: cellY, zoom: scale });
-  }, [canvasPosition, canvasScale]);
+  }, [canvasPosition, canvasScale, setTargetPixel]);
 
   const centralCellSize = PIXEL_SIZE * canvasScale;
 
