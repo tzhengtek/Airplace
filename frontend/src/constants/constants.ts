@@ -25,5 +25,7 @@ export const COLORS_PANEL = [
     "#573400",
 ];
 
-export const GRID_SIZE = 1000;
+export const GRID_SIZE = Number(process.env.NEXT_PUBLIC_GRID_SIZE);
 export const PIXEL_SIZE = 1;
+export const MAX_ZOOM = 50;
+export const MIN_ZOOM = MAX_ZOOM / GRID_SIZE * 10;

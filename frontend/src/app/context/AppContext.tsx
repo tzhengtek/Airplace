@@ -7,7 +7,7 @@ import {
   ReactNode,
   useEffect,
 } from "react";
-import { GRID_SIZE } from "../../constants/constants";
+import { GRID_SIZE, MIN_ZOOM } from "../../constants/constants";
 import {
   CanvasState,
   saveCanvasState,
@@ -62,7 +62,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     y: Math.floor(GRID_SIZE / 2),
   });
   const [canvasPosition, setCanvasPosition] = useState<Point>({ x: 0, y: 0 });
-  const [canvasScale, setCanvasScale] = useState<number>(0.5);
+  const [canvasScale, setCanvasScale] = useState<number>(0);
   const [shouldZoom, setShouldZoom] = useState(false);
   const [targetPixel, setTargetPixel] = useState<Coord | null>(null);
   const [pixels, setPixels] = useState<PixelData[]>([]);
@@ -110,7 +110,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     clearCanvasState();
     setPixels([]);
     setCanvasPosition({ x: 0, y: 0 });
-    setCanvasScale(0.5);
+    setCanvasScale(MIN_ZOOM);
     setSelectedColor("#000000");
   };
 

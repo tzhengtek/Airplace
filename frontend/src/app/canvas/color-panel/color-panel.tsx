@@ -99,6 +99,15 @@ export function ColorPanel() {
 </span>
         </button>
       )}
+      <button
+        onClick={() => {
+          setIsPanelOpen(true);
+          setShouldZoom(true);
+        }}
+        className="bg-white px-8 py-3 text-xl text-black rounded-full shadow-xl/50 hover:shadow-xl/100 transition-shadow duration-300 "
+      >
+        Place a pixel
+      </button>
 
       <div
         className={`fixed inset-0 z-10 transition-opacity duration-300 ${
