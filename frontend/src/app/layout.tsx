@@ -7,6 +7,7 @@ import { ColorPanel } from "@/app/canvas/color-panel/color-panel";
 import { ProfileAvatar } from "@/app/profile-avatar/profile-avatar";
 import "./globals.css";
 import { ColorCoord } from "./canvas/canva-coord/canva-coord";
+import { Suspense } from "react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,14 +34,16 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <AppProvider>
-          <Dropdown />
-          <Canvas />
-          <ColorCoord />
-          <ColorPanel />
-          <ProfileAvatar />
-          {children}
-        </AppProvider>
+        <Suspense>
+          <AppProvider>
+            <Dropdown />
+            <Canvas />
+            <ColorCoord />
+            <ColorPanel />
+            <ProfileAvatar />
+            {children}
+          </AppProvider>
+        </Suspense>
       </body>
     </html>
   );

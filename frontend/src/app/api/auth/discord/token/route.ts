@@ -1,40 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 import axios from "axios";
-import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
+import { SecretManagerServiceClient } from "@google-cloud/secret-manager";
 
-const client = new SecretManagerServiceClient();
-const name = process.env.NEXT_PUBLIC_DISCORD_SECRET || "";
+const secretClient = new SecretManagerServiceClient();
 
-async function getDiscordSecret() {
-  if (!name) {
-    console.error('DISCORD secret name not configured');
-    return "";
-  }
+export async function getSecret(secretName: string): Promise<string> {
+    try {
+        const projectId = process.env.NEXT_PUBLIC_PROJETCT_ID;
+        const secretPath = `projects/${projectId}/secrets/${secretName}/versions/latest`;
 
-  const [version] = await client.accessSecretVersion({ name });
-  const raw = version?.payload?.data;
-  if (!raw) {
-    console.error(`No secret payload found for secret name: ${name}`);
-    return "";
-  }
+        console.log(`Accessing secret: ${secretPath}`);
 
-  try {
-    if (typeof (raw as any).toString === "function") {
-      return (raw as any).toString();
+        const [version] = await secretClient.accessSecretVersion({
+            name: secretPath,
+        });
+
+        if (!version.payload?.data) {
+            throw new Error(`Secret ${secretName} has no data`);
+        }
+
+        const secret = version.payload.data.toString('utf8');
+        if (!secret) {
+            throw new Error(`Secret ${secretName} is empty`);
+        }
+
+        console.log(`Successfully retrieved secret: ${secretName} from Secret Manager`);
+        return secret;
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error(`Error fetching secret: ${secretName}`, errorMessage);
+        throw error;
     }
-    return Buffer.from(raw as Uint8Array).toString("utf8");
-  } catch (err) {
-    console.error("Failed to parse secret payload:", err);
-    return "";
-  }
 }
 
 export async function POST(request: NextRequest) {
   const { code, code_verifier, state } = await request.json();
-  
 
   const DISCORD_CLIENT_ID = process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID || "";
-  const DISCORD_CLIENT_SECRET = await getDiscordSecret();
+  // const DISCORD_CLIENT_SECRET = await getSecret("discord_client_secret");
+  const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || "";
   const DISCORD_REDIRECT_URI = process.env.NEXT_PUBLIC_DISCORD_REDIRECT_URI || "";
 
   if (!DISCORD_CLIENT_SECRET) {
