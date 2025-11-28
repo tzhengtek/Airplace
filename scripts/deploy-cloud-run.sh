@@ -383,7 +383,7 @@ deploy_service() {
     
     # Remove environment variables if specified
     if [ -n "$REMOVE_ENV_VARS" ]; then
-        deploy_cmd="$deploy_cmd --remove-env-vars \"$REMOVE_ENV_VARS\""
+        deploy_cmd="$deploy_cmd --remove-env-vars $REMOVE_ENV_VARS"
     fi
     
     # Add secret environment variable if specified

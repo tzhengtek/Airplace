@@ -69,7 +69,7 @@ func init() {
 }
 
 func drawPixel(w http.ResponseWriter, r *http.Request) {
-	if projectId == "" || firestoreDatabase == "" || chunkSizeEnv == "" || topicID == "" {
+	if projectId == "" || firestoreDatabase == "" || chunkSizeEnv == "" || topicID == "" || addUserTopicID == "" || triggerResetName == "" {
 		http.Error(w, "Environement variable are not set", http.StatusInternalServerError)
 		return
 	}
