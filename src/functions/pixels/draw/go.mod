@@ -2,8 +2,12 @@ module example.com/draw
 
 go 1.25.4
 
+replace example.com/logging => ./logging
+
 require (
 	cloud.google.com/go/firestore v1.20.0
+	cloud.google.com/go/pubsub/v2 v2.3.0
+	example.com/logging v0.0.0
 	github.com/GoogleCloudPlatform/functions-framework-go v1.9.2
 )
 
@@ -12,6 +16,7 @@ require (
 	cloud.google.com/go/auth v0.17.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
+	cloud.google.com/go/iam v1.5.3 // indirect
 	cloud.google.com/go/longrunning v0.7.0 // indirect
 	github.com/cloudevents/sdk-go/v2 v2.16.2 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
@@ -24,6 +29,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
+	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.63.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.63.0 // indirect

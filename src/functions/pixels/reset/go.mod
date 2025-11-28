@@ -2,9 +2,12 @@ module example.com/reset
 
 go 1.25.4
 
+replace example.com/logging => ./logging
+
 require (
 	cloud.google.com/go/pubsub/v2 v2.3.0
 	github.com/GoogleCloudPlatform/functions-framework-go v1.9.2
+	example.com/logging v0.0.0
 	github.com/cloudevents/sdk-go/v2 v2.16.2
 	google.golang.org/api v0.256.0
 	google.golang.org/protobuf v1.36.10

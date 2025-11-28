@@ -329,6 +329,9 @@ deploy_service() {
                 echo "  --set-env-vars $ENV_VARS \\"
             fi
         fi
+        if [ -n "$REMOVE_ENV_VARS" ]; then
+            echo "  --remove-env-vars $REMOVE_ENV_VARS \\"
+        fi
         if [ -n "$SECRET_NAME" ] && [ -n "$SECRET_ENV_KEY" ]; then
             if [ "$is_update" = true ]; then
                 echo "  --update-secrets ${SECRET_ENV_KEY}=${SECRET_NAME}:latest \\"
@@ -378,6 +381,11 @@ deploy_service() {
         fi
     fi
     
+    # Remove environment variables if specified
+    if [ -n "$REMOVE_ENV_VARS" ]; then
+        deploy_cmd="$deploy_cmd --remove-env-vars \"$REMOVE_ENV_VARS\""
+    fi
+    
     # Add secret environment variable if specified
     if [ -n "$SECRET_NAME" ] && [ -n "$SECRET_ENV_KEY" ]; then
         if [ "$is_update" = true ]; then
@@ -412,6 +420,9 @@ deploy_service() {
         else
             echo "  --set-env-vars \"$ENV_VARS\""
         fi
+    fi
+    if [ -n "$REMOVE_ENV_VARS" ]; then
+        echo "  --remove-env-vars \"$REMOVE_ENV_VARS\""
     fi
     if [ -n "$SECRET_NAME" ] && [ -n "$SECRET_ENV_KEY" ]; then
         if [ "$is_update" = true ]; then
@@ -766,6 +777,46 @@ if [ -n "$ENV_VARS" ]; then
     print_success "Environment variables configured: $ENV_VARS"
 fi
 
+# Remove environment variables (only for update mode)
+REMOVE_ENV_VARS=""
+if [ "$DEPLOYMENT_MODE" = "update" ]; then
+    echo ""
+    if ask_yes_no "Do you want to remove any environment variables?" "n"; then
+        print_info "Enter environment variable keys to remove. Leave empty to finish."
+        REMOVE_ENV_COUNT=0
+        
+        while true; do
+            REMOVE_ENV_COUNT=$((REMOVE_ENV_COUNT + 1))
+            echo ""
+            REMOVE_ENV_KEY=$(get_input "Enter environment variable KEY to remove (or leave empty to finish)" "")
+            
+            # If KEY is empty, stop collecting
+            if [ -z "$REMOVE_ENV_KEY" ]; then
+                if [ $REMOVE_ENV_COUNT -eq 1 ]; then
+                    print_info "No environment variables to remove"
+                else
+                    print_success "Finished configuring environment variables to remove"
+                fi
+                break
+            fi
+            
+            # Add to REMOVE_ENV_VARS string in format KEY1,KEY2,KEY3
+            if [ -z "$REMOVE_ENV_VARS" ]; then
+                REMOVE_ENV_VARS="$REMOVE_ENV_KEY"
+            else
+                REMOVE_ENV_VARS="${REMOVE_ENV_VARS},${REMOVE_ENV_KEY}"
+            fi
+            
+            print_success "Added to removal list: $REMOVE_ENV_KEY"
+        done
+        
+        if [ -n "$REMOVE_ENV_VARS" ]; then
+            echo ""
+            print_success "Environment variables to remove: $REMOVE_ENV_VARS"
+        fi
+    fi
+fi
+
 # Service account configuration (only for new deployments)
 echo ""
 if [ "$DEPLOYMENT_MODE" = "new" ]; then
@@ -828,20 +879,19 @@ if [ "$DEPLOYMENT_MODE" = "new" ]; then
         echo "  4) roles/pubsub.editor              – Can modify Pub/Sub topics and subscriptions."
         echo "  5) roles/storage.objectViewer       – Read-only access to Cloud Storage objects."
         echo "  6) roles/storage.objectCreator      – Can upload new objects to Cloud Storage."
-        echo "  7) roles/firestore.user             – Read/write access to Firestore (native mode)."
-        echo "  8) roles/datastore.user             – Read/write access to Firestore in Datastore mode."
-        echo "  9) roles/logging.logWriter          – Write logs to Cloud Logging."
-        echo "  10) roles/secretmanager.secretAccessor – Read access to secrets from Secret Manager."
-        echo "  11) roles/eventarc.eventReceiver    – Allows receiving Eventarc events."
-        echo "  12) roles/run.invoker               – Allows invoking Cloud Run services."
-        echo "  13) Custom (enter your own role)"
-        echo "  14) Skip / Finish (no more roles)"
+        echo "  7) roles/datastore.user             – Read/write access to Firestore in Datastore mode."
+        echo "  8) roles/logging.logWriter          – Write logs to Cloud Logging."
+        echo "  9) roles/secretmanager.secretAccessor – Read access to secrets from Secret Manager."
+        echo "  10) roles/eventarc.eventReceiver    – Allows receiving Eventarc events."
+        echo "  11) roles/run.invoker               – Allows invoking Cloud Run services."
+        echo "  12) Custom (enter your own role)"
+        echo "  13) Skip / Finish (no more roles)"
         echo ""
         
-        read -p "$(echo -e ${YELLOW}Select role [1-14]: ${NC})" role_option
+        read -p "$(echo -e ${YELLOW}Select role [1-13]: ${NC})" role_option
         
-        # If empty or 14, stop collecting roles
-        if [ -z "$role_option" ] || [ "$role_option" = "14" ]; then
+        # If empty or 13, stop collecting roles
+        if [ -z "$role_option" ] || [ "$role_option" = "13" ]; then
             if [ $SA_ROLE_COUNT -eq 1 ]; then
                 print_info "No additional IAM roles configured for service account"
             else
@@ -858,13 +908,12 @@ if [ "$DEPLOYMENT_MODE" = "new" ]; then
             4) SA_ROLE="roles/pubsub.editor";;
             5) SA_ROLE="roles/storage.objectViewer";;
             6) SA_ROLE="roles/storage.objectCreator";;
-            7) SA_ROLE="roles/firestore.user";;
-            8) SA_ROLE="roles/datastore.user";;
-            9) SA_ROLE="roles/logging.logWriter";;
-            10) SA_ROLE="roles/secretmanager.secretAccessor";;
-            11) SA_ROLE="roles/eventarc.eventReceiver";;
-            12) SA_ROLE="roles/run.invoker";;
-            13) 
+            7) SA_ROLE="roles/datastore.user";;
+            8) SA_ROLE="roles/logging.logWriter";;
+            9) SA_ROLE="roles/secretmanager.secretAccessor";;
+            10) SA_ROLE="roles/eventarc.eventReceiver";;
+            11) SA_ROLE="roles/run.invoker";;
+            12) 
                 SA_ROLE=$(get_input "Enter custom IAM role" "")
                 if [ -z "$SA_ROLE" ]; then
                     print_error "Role cannot be empty"
@@ -873,7 +922,7 @@ if [ "$DEPLOYMENT_MODE" = "new" ]; then
                 fi
                 ;;
             *)
-                print_error "Invalid option. Please select 1-14."
+                print_error "Invalid option. Please select 1-13."
                 SA_ROLE_COUNT=$((SA_ROLE_COUNT - 1))
                 continue
                 ;;

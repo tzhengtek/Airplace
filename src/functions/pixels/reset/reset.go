@@ -10,6 +10,7 @@ import (
 	"cloud.google.com/go/pubsub/v2"
 	pubsubadmin "cloud.google.com/go/pubsub/v2/apiv1"
 	adminpb "cloud.google.com/go/pubsub/v2/apiv1/pubsubpb"
+	"example.com/logging"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"google.golang.org/api/iterator"
@@ -24,6 +25,8 @@ var (
 func init() {
 	topicName = os.Getenv("PIXEL_UPDATE_TOPIC")
 	projectID = os.Getenv("PROJECT_ID")
+	log.SetFlags(0)
+
 	functions.CloudEvent("resetPixel", resetPixel)
 }
 
@@ -36,19 +39,17 @@ func resetPixel(ctx context.Context, e event.Event) error {
 		return fmt.Errorf("failed to seek subscriptions: %v", err)
 	}
 
-	log.Printf("Successfully cleared messages from topic: %s", topicName)
+	logging.InfoF("reset", "Successfully cleared messages from topic: %s", topicName)
 	return nil
 }
 
 func seekAllSubscriptionsToNow(ctx context.Context, topicName string) error {
-	// High‑level client for listing topic subscriptions.
 	client, err := pubsub.NewClient(ctx, projectID)
 	if err != nil {
 		return fmt.Errorf("pubsub.NewClient: %v", err)
 	}
 	defer client.Close()
 
-	// Low‑level admin client for Seek.
 	subAdmin, err := pubsubadmin.NewSubscriptionAdminClient(ctx)
 	if err != nil {
 		return fmt.Errorf("apiv1.NewSubscriptionAdminClient: %v", err)
@@ -71,8 +72,7 @@ func seekAllSubscriptionsToNow(ctx context.Context, topicName string) error {
 			return fmt.Errorf("error listing topic subscriptions: %w", err)
 		}
 
-		// subName is already the fully‑qualified subscription name string.
-		log.Printf("Seeking subscription %s to %v", subName, now.AsTime())
+		logging.InfoF("reset", "Seeking subscription %s to %v", subName, now.AsTime())
 
 		_, err = subAdmin.Seek(ctx, &adminpb.SeekRequest{
 			Subscription: subName,

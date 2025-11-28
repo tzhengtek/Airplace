@@ -11,6 +11,7 @@ import (
 	"time"
 
 	pubsub "cloud.google.com/go/pubsub/v2"
+	"example.com/logging"
 	"github.com/GoogleCloudPlatform/functions-framework-go/functions"
 	"github.com/cloudevents/sdk-go/v2/event"
 	"github.com/googleapis/google-cloudevents-go/cloud/firestoredata"
@@ -24,10 +25,10 @@ var (
 )
 
 func init() {
-	log.SetOutput(os.Stdout)
-
 	projectID = os.Getenv("PROJECT_ID")
 	topicID = os.Getenv("PIXEL_UPDATE_TOPIC")
+	log.SetFlags(0)
+
 	functions.CloudEvent("updatedPixel", updatedPixel)
 }
 
@@ -47,11 +48,11 @@ func updatedPixel(ctx context.Context, event event.Event) error {
 		return fmt.Errorf("proto.Unmarshal: %w", err)
 	}
 
-	log.Printf("Function triggered by change to: %v\n", event.Source())
+	logging.InfoF("update", "Function triggered by change to: %v", event.Source())
 
 	doc := data.GetValue()
 	if doc == nil {
-		log.Println("No new document value; nothing to publish")
+		logging.Info("update", "No new document value; nothing to publish")
 		return nil
 	}
 
@@ -65,7 +66,7 @@ func updatedPixel(ctx context.Context, event event.Event) error {
 		return fmt.Errorf("buildChunkPayload: %w", err)
 	}
 
-	log.Printf("Payload: %s", payload)
+	logging.InfoF("update", "Payload: %s", payload)
 
 	if err := publishChunk(ctx, payload, projectID, topicID); err != nil {
 		return fmt.Errorf("publishChunk: %w", err)
@@ -230,7 +231,7 @@ func publishChunk(ctx context.Context, payload []byte, projectID string, topicID
 	}
 	defer client.Close()
 
-	log.Printf("Publishing chunk to topic %s", topicID)
+	logging.InfoF("update", "Publishing chunk to topic %s", topicID)
 
 	topic := client.Publisher(topicID)
 	defer topic.Stop()
@@ -242,6 +243,6 @@ func publishChunk(ctx context.Context, payload []byte, projectID string, topicID
 		return fmt.Errorf("topic.Publish: %w", err)
 	}
 
-	log.Printf("Published chunk with message ID: %s", msgID)
+	logging.InfoF("update", "Published chunk with message ID: %s", msgID)
 	return nil
 }
