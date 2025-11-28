@@ -46,10 +46,6 @@ function subscriptionPath() {
   return subscriberAdmin.subscriptionPath(PROJECT_ID, SUBSCRIPTION_NAME);
 }
 
-/**
- * SOLUTION RAPIDE: Pull avec returnImmediately
- * Le pull ne bloque pas s'il n'y a pas de messages
- */
 async function pullAllMessagesFast() {
   const subscription = subscriptionPath();
   const collectedMessages = [];
@@ -135,25 +131,98 @@ async function resetAckDeadlineOptimized(ackIds) {
   console.info(`[resetAckDeadline] Restored ${ackIds.length} messages`);
 }
 
-async function renderSnapshot() {
+function tryParseJson(str) {
+  try {
+    return JSON.parse(str);
+  } catch (err) {
+    return null;
+  }
+}
+
+function parseMessagesToPixels(messageStrings) {
+  const out = [];
+  if (!Array.isArray(messageStrings) || messageStrings.length === 0) return out;
+
+  for (const msgStr of messageStrings) {
+    if (!msgStr) continue;
+    const obj = tryParseJson(msgStr);
+    if (!obj) {
+      console.warn('[parseMessagesToPixels] invalid json message, skipping');
+      continue;
+    }
+
+    const { chunkX, chunkY, size = 10, pixels } = obj;
+    if (typeof chunkX !== 'number' || typeof chunkY !== 'number' || !pixels || typeof pixels !== 'object') {
+      console.warn('[parseMessagesToPixels] message missing expected fields (chunkX,chunkY,pixels), skipping', { hasChunkX: typeof chunkX === 'number', hasChunkY: typeof chunkY === 'number', hasPixels: !!pixels });
+      continue;
+    }
+
+    for (const key of Object.keys(pixels)) {
+      const parts = key.split('_');
+      if (parts.length !== 2) continue;
+      const px = Number(parts[0]);
+      const py = Number(parts[1]);
+      if (Number.isNaN(px) || Number.isNaN(py)) continue;
+
+      const val = pixels[key];
+      if (!val) continue;
+      const colorIndex = val.color ?? val.col ?? null;
+      const colorHex = colorIndex !== null && COLOR_DEFINES[colorIndex] ? COLOR_DEFINES[colorIndex] : (val.colorHex || null);
+
+      const globalX = chunkX * size + px;
+      const globalY = chunkY * size + py;
+
+      out.push({ x: globalX, y: globalY, color: colorHex });
+    }
+  }
+  return out;
+}
+
+function hexToRgba(hex) {
+  if (!hex || typeof hex !== 'string') return [0, 0, 0, 255];
+  const h = hex.replace('#', '');
+  if (h.length === 3) {
+    return [
+      parseInt(h[0] + h[0], 16),
+      parseInt(h[1] + h[1], 16),
+      parseInt(h[2] + h[2], 16),
+      255
+    ];
+  }
+  if (h.length === 6) {
+    return [
+      parseInt(h.substring(0, 2), 16),
+      parseInt(h.substring(2, 4), 16),
+      parseInt(h.substring(4, 6), 16),
+      255
+    ];
+  }
+  return [0, 0, 0, 255];
+}
+
+async function renderSnapshot(newPixels) {
   const bucket = storage.bucket(SNAPSHOT_BUCKET);
   const file = bucket.file(SNAPSHOT_NAME);
   const [buffer] = await file.download();
   const img = sharpMod(buffer);
   const metadata = await img.metadata();
-  const width = metadata.width ?? 0;
-  const height = metadata.height ?? 0;
-
+  const width = metadata.width ?? (process.env.IMAGE_WIDTH || 100);
+  const height = metadata.height ?? (process.env.IMAGE_HEIGHT || 100);
   const raw = await img.ensureAlpha().raw().toBuffer();
   const channels = 4;
 
-  for (let y = 0; y < 2 && y < height; y++) {
-    for (let x = 0; x < 2 && x < width; x++) {
+  if (Array.isArray(newPixels) && newPixels.length > 0) {
+    for (const p of newPixels) {
+      if (!p || typeof p.x !== 'number' || typeof p.y !== 'number') continue;
+      const x = p.x;
+      const y = p.y;
+      if (x < 0 || y < 0 || x >= width || y >= height) continue;
       const idx = (y * width + x) * channels;
-      raw[idx] = 0;
-      raw[idx + 1] = 0;
-      raw[idx + 2] = 0;
-      raw[idx + 3] = 255;
+      const rgba = hexToRgba(p.color);
+      raw[idx] = rgba[0];
+      raw[idx + 1] = rgba[1];
+      raw[idx + 2] = rgba[2];
+      raw[idx + 3] = rgba[3] ?? 255;
     }
   }
 
@@ -162,12 +231,19 @@ async function renderSnapshot() {
 
 export async function generateView(payload) {
   let pulled = { collectedMessages: [], ackIds: [] };
-
   try {
     pulled = await pullAllMessagesFast();
-    console.info(`[generateView] received ${pulled.collectedMessages.length} messages`);
+  console.info(`[generateView] received ${pulled.collectedMessages.length} messages`);
+  console.info(`[generateView] received ${pulled.collectedMessages} messages`);
   } catch (err) {
     console.error('[generateView] pull failed', err);
+  }
+
+  try {
+  var parsedPixels = parseMessagesToPixels(pulled.collectedMessages);
+  console.info(`[generateView] Parsed pixels: ${parsedPixels.length} items. Sample:`, parsedPixels);
+  } catch (err) {
+    console.error('[generateView] Failed to parse messages to pixels', err);
   }
 
   try {
@@ -177,7 +253,7 @@ export async function generateView(payload) {
   }
 
   try {
-    return await renderSnapshot();
+  return await renderSnapshot(parsedPixels);
   } catch (err) {
     console.error('[generateView] Rendering failed', err);
     throw err;
