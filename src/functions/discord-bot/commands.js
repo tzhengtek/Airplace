@@ -95,7 +95,7 @@ async function drawPixel(pubSubClient, x, y, color, userId, appId, interactionTo
         } else {
             const now = Date.now();
             const lastDraw = userData.lastUpdated ? userData.lastUpdated.toMillis() : 0;
-            const RATE_LIMIT_MS = 300 * 1000;
+            const RATE_LIMIT_MS = process.env.RATE_LIMIT * 1000;
             if (now - lastDraw < RATE_LIMIT_MS) {
                 let timeleft = Math.ceil((RATE_LIMIT_MS - (now - lastDraw)) / 1000);
                 logger({ severity: Severity.WARNING, message: 'User rate limited', user: payload.user, timeleft });
@@ -122,10 +122,11 @@ async function drawPixel(pubSubClient, x, y, color, userId, appId, interactionTo
     }
 }
 
-export function handleViewCommand(pubSubClient, appId, interactionToken) {
+export function handleViewCommand(pubSubClient, appId, userId, interactionToken) {
     try {
         let payload = {
             command: "view",
+            userId: userId,
             interactionToken: interactionToken
         };
         logger({ severity: Severity.INFO, message: 'Publishing command.queue event', payload: { command: 'view', interactionToken } });

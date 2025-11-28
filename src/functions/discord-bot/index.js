@@ -95,7 +95,7 @@ functions.http('discordInteractions', (req, res) => {
                         const color = drawOptions.find(opt => opt.name === 'color')?.value;
                         return res.json(handleDrawPixelCommand(pubSubClient, x, y, color, userId, cachedAppId, interactionToken, db));
                     case 'view':
-                        return res.json(handleViewCommand(pubSubClient, cachedAppId, req.body.token));
+                        return res.json(handleViewCommand(pubSubClient, cachedAppId, userId, interactionToken));
                     default:
                         logger({ severity: Severity.WARNING, message: 'Unknown subcommand', subcommand: subcommandName ?? subcommand?.name ?? subcommand });
                         return res.json(ephemeralMessageResponse(`❌ Unknown subcommand 😢`));
