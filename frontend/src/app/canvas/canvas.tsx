@@ -3,10 +3,13 @@
 import { useEffect, useRef, MouseEvent } from "react";
 import { CanvaPixel, coordsToId } from "./canva-pixel/canva-pixel";
 import { useAppContext } from "../context/AppContext";
-import { GRID_SIZE, PIXEL_SIZE } from "@/constants/constants";
+import {
+  GRID_SIZE,
+  PIXEL_SIZE,
+  MAX_ZOOM,
+  MIN_ZOOM,
+} from "@/constants/constants";
 
-const MIN_ZOOM = 0.5;
-const MAX_ZOOM = 50;
 const CLICK_DISTANCE_THRESHOLD = 5;
 const ZOOM_FACTOR = 0.05;
 

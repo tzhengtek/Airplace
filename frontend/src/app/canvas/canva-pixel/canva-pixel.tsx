@@ -20,7 +20,6 @@ export function coordsToId(x: number, y: number) {
   return y * GRID_SIZE + x;
 }
 
-// Peindre un pixel sur le canvas
 export function paintPixel(
   canvasRef: React.MutableRefObject<HTMLCanvasElement | null>,
   x: number,
