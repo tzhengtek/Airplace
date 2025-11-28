@@ -1,72 +1,169 @@
 "use client";
 
 import { Dialog, DialogPanel, DialogTitle, Button } from "@headlessui/react";
-import { X } from "lucide-react";
+import { X, LogOut } from "lucide-react";
 import { useAppContext } from "@/app/context/AppContext";
+import { initiateDiscordLogin } from "@/utils/discordAuth";
+import { useEffect, useState } from "react";
+
+interface DiscordUser {
+  id: string;
+  username: string;
+  discriminator: string;
+  avatar: string;
+  email: string;
+}
 
 export function Login() {
   const { isLoginOpen, setIsLoginOpen } = useAppContext();
+  const [token, setToken] = useState<string | null>(null);
+  const [user, setUser] = useState<DiscordUser | null>(null);
+  const [showConfirmDisconnect, setShowConfirmDisconnect] = useState(false);
+
+  useEffect(() => {
+    if (isLoginOpen) {
+      const storedToken = localStorage.getItem("discord_token");
+      const storedUser = localStorage.getItem("discord_user");
+      setToken(storedToken);
+      if (storedUser) {
+        setUser(JSON.parse(storedUser));
+      }
+    }
+  }, [isLoginOpen]);
 
   const handleDiscordLogin = async () => {
-    const params = new URLSearchParams({
-      client_id: process.env.NEXT_PUBLIC_CLIENT_ID || "",
-      redirect_uri: process.env.NEXT_PUBLIC_REDIRECT_URI || "",
-      response_type: "code",
-      scope: "identify email",
-    });
-    window.location.assign(
-      `https://discord.com/api/oauth2/authorize?${params.toString()}`
-    );
+    try {
+      await initiateDiscordLogin();
+    } catch (error) {
+      console.error("Discord login failed:", error);
+    }
+  };
+
+  const handleDisconnect = () => {
+    localStorage.removeItem("discord_token");
+    localStorage.removeItem("discord_user");
+    setToken(null);
+    setUser(null);
+    setShowConfirmDisconnect(false);
+  };
+
+  const getDiscordAvatarUrl = (userId: string, avatarHash: string) => {
+    return `https://cdn.discordapp.com/avatars/${userId}/${avatarHash}.png`;
   };
 
   return (
-    <Dialog
-      open={isLoginOpen}
-      onClose={() => setIsLoginOpen(false)}
-      className="relative z-50"
-    >
-      <div className="fixed inset-0 flex w-screen items-center justify-center p-4 overflow-y-auto">
-        <DialogPanel className="w-full max-w-md rounded-md bg-white p-10 text-black shadow-xl/50">
-          <div className="flex items-center justify-between pb-4 border-b border-gray-200">
-            <DialogTitle className="flex font-bold text-3xl">
-              Sign in
-            </DialogTitle>
-            <X
-              onClick={() => setIsLoginOpen(false)}
-              className="size-8 bg-transparent rounded-lg text-gray-400 hover:text-black justify-center cursor-pointer"
-            />
-          </div>
+    <>
+      <Dialog
+        open={isLoginOpen}
+        onClose={() => setIsLoginOpen(false)}
+        className="relative z-50"
+      >
+        <div className="fixed inset-0 flex w-screen items-center justify-center p-4 overflow-y-auto">
+          <DialogPanel className="w-full max-w-md rounded-md bg-white p-10 text-black shadow-xl/50 animate-pop-in">
+            <div className="flex items-center justify-between pb-4 border-b border-gray-200">
+              <DialogTitle className="flex font-bold text-3xl">
+                Sign in
+              </DialogTitle>
+              <X
+                onClick={() => setIsLoginOpen(false)}
+                className="size-8 bg-transparent rounded-lg text-gray-400 hover:text-black justify-center cursor-pointer"
+              />
+            </div>
 
-          <div className="mt-6 flex flex-col gap-3">
-            <Button
-              onClick={() => {
-                console.log("Discord login clicked");
-                handleDiscordLogin();
-              }}
-              className="cursor-pointer justify-center text-zinc-200 flex gap-2 hover:shadow-xl/10 items-center bg-[#5865F2] px-4 py-2 rounded-lg font-medium text-sm hover:bg-[#3b4aed] transition-all ease-in duration-200"
-            >
-              <svg
-                className="w-6"
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 48 48"
+            <div className="mt-6 flex flex-col gap-3">
+              {user && token ? (
+                <>
+                  <div className="flex flex-col items-center gap-4">
+                    <img
+                      src={getDiscordAvatarUrl(user.id, user.avatar)}
+                      alt={user.username}
+                      className="w-32 h-32 rounded-full border-2 border-[#5865F2]"
+                    />
+                    <p className="text-xl font-semibold text-gray-800">
+                      {user.username}
+                    </p>
+                  </div>
+                  {/* <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="text-xs font-semibold text-gray-600 mb-2">
+                    Token Discord :
+                  </p>
+                  <p className="text-xs text-gray-700 break-all font-mono">
+                    {token}
+                  </p>
+                </div> */}
+                  <Button
+                    onClick={() => setShowConfirmDisconnect(true)}
+                    className="cursor-pointer justify-center text-white flex gap-2 hover:shadow-xl/10 items-center bg-red-500 px-4 py-2 rounded-lg font-medium text-sm hover:bg-red-600 transition-all ease-in duration-200"
+                  >
+                    <LogOut className="w-5 h-5" />
+                    Disconnect
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    onClick={() => {
+                      console.log("Discord login clicked");
+                      handleDiscordLogin();
+                    }}
+                    className="cursor-pointer justify-center text-zinc-200 flex gap-2 hover:shadow-xl/10 items-center bg-[#5865F2] px-4 py-2 rounded-lg font-medium text-sm hover:bg-[#3b4aed] transition-all ease-in duration-200"
+                  >
+                    <svg
+                      className="w-6"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 48 48"
+                    >
+                      <path
+                        d="M39.248,10.177c-2.804-1.287-5.812-2.235-8.956-2.778c-0.057-0.01-0.114,0.016-0.144,0.068	c-0.387,0.688-0.815,1.585-1.115,2.291c-3.382-0.506-6.747-0.506-10.059,0c-0.3-0.721-0.744-1.603-1.133-2.291	c-0.03-0.051-0.087-0.077-0.144-0.068c-3.143,0.541-6.15,1.489-8.956,2.778c-0.024,0.01-0.045,0.028-0.059,0.051	c-5.704,8.522-7.267,16.835-6.5,25.044c0.003,0.04,0.026,0.079,0.057,0.103c3.763,2.764,7.409,4.442,10.987,5.554	c0.057,0.017,0.118-0.003,0.154-0.051c0.846-1.156,1.601-2.374,2.248-3.656c0.038-0.075,0.002-0.164-0.076-0.194	c-1.197-0.454-2.336-1.007-3.432-1.636c-0.087-0.051-0.094-0.175-0.014-0.234c0.231-0.173,0.461-0.353,0.682-0.534	c0.04-0.033,0.095-0.04,0.142-0.019c7.201,3.288,14.997,3.288,22.113,0c0.047-0.023,0.102-0.016,0.144,0.017	c0.22,0.182,0.451,0.363,0.683,0.536c0.08,0.059,0.075,0.183-0.012,0.234c-1.096,0.641-2.236,1.182-3.434,1.634	c-0.078,0.03-0.113,0.12-0.075,0.196c0.661,1.28,1.415,2.498,2.246,3.654c0.035,0.049,0.097,0.07,0.154,0.052	c3.595-1.112,7.241-2.79,11.004-5.554c0.033-0.024,0.054-0.061,0.057-0.101c0.917-9.491-1.537-17.735-6.505-25.044	C39.293,10.205,39.272,10.187,39.248,10.177z M16.703,30.273c-2.168,0-3.954-1.99-3.954-4.435s1.752-4.435,3.954-4.435	c2.22,0,3.989,2.008,3.954,4.435C20.658,28.282,18.906,30.273,16.703,30.273z M31.324,30.273c-2.168,0-3.954-1.99-3.954-4.435	s1.752-4.435,3.954-4.435c2.22,0,3.989,2.008,3.954,4.435C35.278,28.282,33.544,30.273,31.324,30.273z"
+                        className="fill-zinc-200"
+                      />
+                    </svg>
+                    Login with Discord
+                  </Button>
+                </>
+              )}
+
+              <Button
+                className="px-4 py-2 rounded-md bg-gray-200 text-black hover:bg-red-500 hover:text-white transition-colors duration-200 hover:shadow-xl/10"
+                onClick={() => setIsLoginOpen(false)}
               >
-                <path
-                  d="M39.248,10.177c-2.804-1.287-5.812-2.235-8.956-2.778c-0.057-0.01-0.114,0.016-0.144,0.068	c-0.387,0.688-0.815,1.585-1.115,2.291c-3.382-0.506-6.747-0.506-10.059,0c-0.3-0.721-0.744-1.603-1.133-2.291	c-0.03-0.051-0.087-0.077-0.144-0.068c-3.143,0.541-6.15,1.489-8.956,2.778c-0.024,0.01-0.045,0.028-0.059,0.051	c-5.704,8.522-7.267,16.835-6.5,25.044c0.003,0.04,0.026,0.079,0.057,0.103c3.763,2.764,7.409,4.442,10.987,5.554	c0.057,0.017,0.118-0.003,0.154-0.051c0.846-1.156,1.601-2.374,2.248-3.656c0.038-0.075,0.002-0.164-0.076-0.194	c-1.197-0.454-2.336-1.007-3.432-1.636c-0.087-0.051-0.094-0.175-0.014-0.234c0.231-0.173,0.461-0.353,0.682-0.534	c0.04-0.033,0.095-0.04,0.142-0.019c7.201,3.288,14.997,3.288,22.113,0c0.047-0.023,0.102-0.016,0.144,0.017	c0.22,0.182,0.451,0.363,0.683,0.536c0.08,0.059,0.075,0.183-0.012,0.234c-1.096,0.641-2.236,1.182-3.434,1.634	c-0.078,0.03-0.113,0.12-0.075,0.196c0.661,1.28,1.415,2.498,2.246,3.654c0.035,0.049,0.097,0.07,0.154,0.052	c3.595-1.112,7.241-2.79,11.004-5.554c0.033-0.024,0.054-0.061,0.057-0.101c0.917-9.491-1.537-17.735-6.505-25.044	C39.293,10.205,39.272,10.187,39.248,10.177z M16.703,30.273c-2.168,0-3.954-1.99-3.954-4.435s1.752-4.435,3.954-4.435	c2.22,0,3.989,2.008,3.954,4.435C20.658,28.282,18.906,30.273,16.703,30.273z M31.324,30.273c-2.168,0-3.954-1.99-3.954-4.435	s1.752-4.435,3.954-4.435c2.22,0,3.989,2.008,3.954,4.435C35.278,28.282,33.544,30.273,31.324,30.273z"
-                  className="fill-zinc-200"
-                />
-              </svg>
-              Login with Discord
-            </Button>
+                Cancel
+              </Button>
+            </div>
+          </DialogPanel>
+        </div>
+      </Dialog>
 
-            <Button
-              className="px-4 py-2 rounded-md bg-gray-200 text-black hover:bg-red-500 hover:text-white transition-colors duration-200 hover:shadow-xl/10"
-              onClick={() => setIsLoginOpen(false)}
-            >
-              Cancel
-            </Button>
-          </div>
-        </DialogPanel>
-      </div>
-    </Dialog>
+      <Dialog
+        open={showConfirmDisconnect}
+        onClose={() => setShowConfirmDisconnect(false)}
+        className="relative z-50"
+      >
+        <div className="fixed inset-0 flex w-screen items-center justify-center p-4">
+          <DialogPanel className="w-full max-w-sm rounded-md bg-white p-6 text-black shadow-xl/50">
+            <DialogTitle className="font-bold text-lg mb-4">
+              Confirm Disconnect
+            </DialogTitle>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to disconnect your Discord account?
+            </p>
+            <div className="flex gap-3">
+              <Button
+                onClick={handleDisconnect}
+                className="flex-1 cursor-pointer justify-center text-white bg-red-500 px-4 py-2 rounded-lg font-medium text-sm hover:bg-red-600 transition-all ease-in duration-200"
+              >
+                Disconnect
+              </Button>
+              <Button
+                onClick={() => setShowConfirmDisconnect(false)}
+                className="flex-1 cursor-pointer justify-center text-gray-800 bg-gray-200 px-4 py-2 rounded-lg font-medium text-sm hover:bg-gray-300 transition-all ease-in duration-200"
+              >
+                Cancel
+              </Button>
+            </div>
+          </DialogPanel>
+        </div>
+      </Dialog>
+    </>
   );
 }
