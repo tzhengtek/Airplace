@@ -4,6 +4,7 @@ import { Dropdown } from "./dropdown/dropdown";
 import { Canvas } from "./canvas/canvas";
 import { AppProvider } from "./context/AppContext";
 import { ColorPanel } from "@/app/canvas/color-panel/color-panel";
+import { ProfileAvatar } from "@/app/profile-avatar/profile-avatar";
 import "./globals.css";
 import { ColorCoord } from "./canvas/canva-coord/canva-coord";
 
@@ -37,6 +38,7 @@ export default function RootLayout({
           <Canvas />
           <ColorCoord />
           <ColorPanel />
+          <ProfileAvatar />
           {children}
         </AppProvider>
       </body>
