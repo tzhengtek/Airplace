@@ -46,13 +46,13 @@ const secretsKey = [
 const [firebaseApiKey, authDomain, storageBucket, messagingSenderId, appId, measurementId] = await Promise.all(secretsKey.map(secret => getSecret(secret)));
 
 const firebaseConfig = {
-  apiKey: firebaseApiKey,
-  authDomain: authDomain,
-  storageBucket: storageBucket,
-  messagingSenderId: messagingSenderId,
-  appId: appId,
-  measurementId: measurementId,
-  projectId: process.env.NEXT_PUBLIC_PROJECT_ID || '',
+  apiKey: "AIzaSyAIGJZ47DSxkHwuKgk_kr6jvrFntbe0YJk",
+  authDomain: "serverless-epitech-prd.firebaseapp.com",
+  projectId: "serverless-epitech-prd",
+  storageBucket: "serverless-epitech-prd.firebasestorage.app",
+  messagingSenderId: "10696410086",
+  appId: "1:10696410086:web:58b64c8fcdfa8884178c27",
+  measurementId: "G-LXWR91J0GL"
 };
 
 const app = initializeApp(firebaseConfig);

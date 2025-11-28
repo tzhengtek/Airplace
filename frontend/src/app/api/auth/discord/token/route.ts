@@ -37,8 +37,8 @@ export async function POST(request: NextRequest) {
   const { code, code_verifier, state } = await request.json();
 
   const DISCORD_CLIENT_ID = process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID || "";
-  // const DISCORD_CLIENT_SECRET = await getSecret("discord_client_secret");
-  const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || "";
+  const DISCORD_CLIENT_SECRET = await getSecret("discord_client_secret");
+  // const DISCORD_CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET || "";
   const DISCORD_REDIRECT_URI = process.env.NEXT_PUBLIC_DISCORD_REDIRECT_URI || "";
 
   if (!DISCORD_CLIENT_SECRET) {
