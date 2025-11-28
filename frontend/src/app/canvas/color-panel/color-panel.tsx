@@ -33,10 +33,10 @@ export function ColorPanel() {
   }, [isPanelOpen, selectedColor]);
 
   return (
-    <div className="fixed bottom-4 left-0 right-0 flex justify-center">
+    <div className="fixed bottom-4 left-0 right-0 flex justify-center transition-transform hover:scale-110 duration-200">
       <button
         onClick={() => (setIsPanelOpen(true), setShouldZoom(true))}
-        className="bg-white px-8 py-3 text-xl text-black rounded-full shadow-xl/50 hover:shadow-xl/100 hover:bg-blue-100 transition-shadow duration-300 "
+        className="bg-white px-8 py-3 text-xl text-black rounded-full shadow-xl/50 hover:shadow-xl/100 transition-shadow duration-300 "
       >
         Place a pixel
       </button>
