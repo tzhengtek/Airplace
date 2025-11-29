@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 
-const gatewayURL = "https://airplace-gateway-4zbbjsv3.ew.gateway.dev";
+const gatewayURL = process.env.NEXT_PUBLIC_GATEWAY_URL;
 
 // Custom error type so callers can access status and JSON body (e.g. { lastUpdated: ... })
 export class ApiError extends Error {
