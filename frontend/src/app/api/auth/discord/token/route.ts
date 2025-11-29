@@ -6,7 +6,7 @@ const secretClient = new SecretManagerServiceClient();
 
 export async function getSecret(secretName: string): Promise<string> {
     try {
-        const projectId = process.env.NEXT_PUBLIC_PROJETCT_ID;
+        const projectId = process.env.NEXT_PUBLIC_PROJECT_ID;
         const secretPath = `projects/${projectId}/secrets/${secretName}/versions/latest`;
 
         console.log(`Accessing secret: ${secretPath}`);
