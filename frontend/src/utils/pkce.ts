@@ -1,3 +1,5 @@
+"use client";
+
 function generateRandomString(length: number): string {
   const chars =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";

@@ -30,6 +30,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-  ],
+, "src/app/api/auth/discord/callback/route.ts"  ],
   "exclude": ["node_modules"]
 }

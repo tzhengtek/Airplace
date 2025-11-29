@@ -43,15 +43,15 @@ export function ColorPanel() {
       setCanDraw(true);
       return;
     }
-  
-    const COOLDOWN_DURATION = Number(process.env.NEXT_PUBLIC_COOLDOWN_DURATION) * 1000;
-  
+
+    const COOLDOWN_DURATION =
+      Number(process.env.NEXT_PUBLIC_COOLDOWN_DURATION) * 1000;
+
     const updateTimeLeft = () => {
       const lastUpdatedTime = new Date(lastUpdated).getTime();
       const now = Date.now();
       const elapsedTime = now - lastUpdatedTime;
       const remainingTime = COOLDOWN_DURATION - elapsedTime;
-  
 
       if (remainingTime <= 0) {
         // Cooldown is over
@@ -60,12 +60,12 @@ export function ColorPanel() {
         setLastUpdated(null);
         return;
       }
-  
+
       const remainingSeconds = Math.ceil(remainingTime / 1000);
       setTimeLeft(remainingSeconds);
       setCanDraw(false);
     };
-  
+
     updateTimeLeft();
     const interval = setInterval(updateTimeLeft, 1000);
     return () => clearInterval(interval);
@@ -87,16 +87,16 @@ export function ColorPanel() {
         >
           You can place a pixel in&nbsp;
           <span>
-  {timeLeft !== null
-    ? (() => {
-        const minutes = Math.floor(timeLeft / 60);
-        const seconds = timeLeft % 60;
-        return `${minutes.toString().padStart(2, "0")}:${seconds
-          .toString()
-          .padStart(2, "0")}`;
-      })()
-    : "a few moments"}
-</span>
+            {timeLeft !== null
+              ? (() => {
+                  const minutes = Math.floor(timeLeft / 60);
+                  const seconds = timeLeft % 60;
+                  return `${minutes.toString().padStart(2, "0")}:${seconds
+                    .toString()
+                    .padStart(2, "0")}`;
+                })()
+              : "a few moments"}
+          </span>
         </button>
       )}
 
@@ -150,27 +150,27 @@ export function ColorPanel() {
               onClick={() => {
                 if (colors && targetPixel) {
                   setSelectedColor(colors);
-                  apiClient.drawPixel(
-                    targetPixel.x,
-                    targetPixel.y,
-                    COLORS_PANEL.indexOf(colors),
-                  )
-                  .then(() => {
-                    setCanDraw(true);
-                    paintPixel(canvasRef, targetPixel.x, targetPixel.y, colors);
-                    addPixel({
-                      x: targetPixel.x,
-                      y: targetPixel.y,
-                      color: colors,
+                  apiClient
+                    .drawPixel(
+                      targetPixel.x,
+                      targetPixel.y,
+                      COLORS_PANEL.indexOf(colors)
+                    )
+                    .then(() => {
+                      setCanDraw(true);
+                      paintPixel(
+                        canvasRef,
+                        targetPixel.x,
+                        targetPixel.y,
+                        colors
+                      );
+                    })
+                    .catch((err) => {
+                      if (err.status === 403) {
+                        setLastUpdated(err.data.lastUpdated);
+                        setCanDraw(false);
+                      }
                     });
-                  })
-                  .catch((err) => {
-                    if (err.status === 403) {
-                      setLastUpdated(err.data.lastUpdated);
-                      setCanDraw(false);
-                    }
-                  });
-
                 }
                 setIsPanelOpen(false);
               }}
