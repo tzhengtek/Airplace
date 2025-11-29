@@ -34,14 +34,12 @@ export default function DiscordCallbackPage() {
         const result = await handleDiscordCallback(code);
         console.log("User authenticated:", result.user);
 
-        // Store token and user info
         if (result.access_token) {
           localStorage.setItem("discord_token", result.access_token);
         }
         if (result.user) {
           localStorage.setItem("discord_user", JSON.stringify(result.user));
           localStorage.setItem("discord_user_id", result.user.id);
-          // Trigger storage event for ProfileAvatar component
           window.dispatchEvent(new Event("storage"));
         }
 

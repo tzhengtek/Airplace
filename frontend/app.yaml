@@ -11,4 +11,14 @@ env_variables:
   NEXT_PUBLIC_DISCORD_REDIRECT_URI: "https://europe-west6-serverless-epitech-prd.appspot.com/api/auth/discord/callback"
   NEXT_PUBLIC_DISCORD_SECRET: "projects/serverless-epitech-prd/secrets/discord-client-secret/versions/latest"
   NEXT_PUBLIC_GRID_SIZE: 100
-  BUCKET_NAME: "example-gcs-bucket"
+  BUCKET_NAME: "gcs-bucket"
+  NEXT_PUBLIC_COOLDOWN_DURATION: 30
+  NEXT_PUBLIC_GATEWAY_URL: "https://airplace-gateway-4wwd6ue.ew.gateway.dev"
+  NEXT_PUBLIC_FIRESTORE_DATABASE_ID: serverless-epitech-firestore
+  NEXT_PUBLIC_PROJECT_ID: serverless-epitech-prd
+  NEXT_PUBLIC_FIREBASE_API_KEY: AIzaSyAIGJZ47DSxkHwuKgk_kr6jvrFntbe0YJk
+  NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: serverless-epitech-prd.firebaseapp.com
+  NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: serverless-epitech-prd.firebasestorage.app
+  NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: 10696410086
+  NEXT_PUBLIC_FIREBASE_APP_ID: 1:10696410086:web:58b64c8fcdfa8884178c27
+  NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: G-LXWR91J0GL
